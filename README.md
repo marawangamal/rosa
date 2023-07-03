@@ -40,11 +40,36 @@ python train.py
 The E2E or ELI5 dataset will be downloaded and cached in the path specified 
 by `dataset.cache`. The model will be saved in the path specified by `output.path`.
 
-
 ## Evaluation
 
 To visualize train/validation curves of model(s) in the paper, run:
 
 ```commandline
-tensorboard --logdir=/output/path/to/save/model/weights
+tensorboard --logdir=/output/path/to/saved/model/weights
+```
+
+## Recreating the results
+To run all experiments in the paper simultaneously on SLURM, run:
+
+```commandline
+python jobrunner.py --fn jobs.yaml
+```
+
+Monitor the status of the jobs with:
+
+```commandline
+python jobrunner.py -s
+```
+
+## Citation
+If you find this repository useful in your research, please cite our paper:
+
+```bibtex
+@inproceedings{hameed2023rosa,
+  title={ROSA: Random Orthogonal Subspace Adaptation},
+  author={Marawan Gamal Abdel Hameed and Guillaume Rabusseau}
+  maintitle = {International Conference on Machine Learning},
+  booktitle = {Efficient Systems for Foundation Models},
+  year={2023}
+}
 ```
