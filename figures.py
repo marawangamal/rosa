@@ -15,7 +15,7 @@ rank_color_map = dict()
 
 
 def rosa_vs_lora_plot_name_func(s):
-    name = {"factorized": "ROSA", "lora": "LoRA", "none": "Baseline"}[s.split("_name")[1].split("_")[0]]
+    name = {"rosa": "ROSA", "factorized": "ROSA", "lora": "LoRA", "none": "Baseline"}[s.split("_name")[1].split("_")[0]]
     rank = s.split("_r")[1].split("_")[0]
     return name + f" (r={rank})" if name in ['ROSA', 'LoRA'] else name
 
@@ -71,7 +71,7 @@ experiments = {
         "xticks": list(range(1, 6, 1)),
         "scalar_name": "valid/bpc",
         "plot_name_func": rosa_vs_lora_plot_name_func,
-        "plot_marker_func": lambda s: {"factorized": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
+        "plot_marker_func": lambda s: {"rosa": "o-", "factorized": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
         # "plot_marker_func": lambda s: random.choice(markers),
         "plot_color_func": rosa_vs_lora_plot_color_func,
         "regex": r'^(?=.*random)(?=.*gpt2_).*'
@@ -92,7 +92,7 @@ experiments = {
         "xticks": list(range(1, 6, 1)),
         "scalar_name": "valid/bpc",
         "plot_name_func": rosa_vs_lora_plot_name_func,
-        "plot_marker_func": lambda s: {"factorized": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
+        "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
         "plot_color_func": rosa_vs_lora_plot_color_func,
         "regex": r'^(?=.*random)(?=.*gpt2-medium).*'
     },
@@ -102,7 +102,7 @@ experiments = {
         "xticks": list(range(1, 6, 1)),
         "scalar_name": "valid/bpc",
         "plot_name_func": rosa_vs_lora_plot_name_func,
-        "plot_marker_func": lambda s: {"factorized": "o-", "lora": "x--", "none": "s-"}[
+        "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-"}[
             s.split("_name")[1].split("_")[0]],
         "plot_color_func": rosa_vs_lora_plot_color_func,
         "regex": r'^(?=.*random)(?=.*gpt2-large).*'
