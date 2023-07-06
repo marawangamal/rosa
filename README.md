@@ -16,7 +16,7 @@ To train ROSA model(s) in the paper, run this command:
 ```commandline
 python train.py 
     dataset.cache=/path/to/save/downloaded/dataset
-    output.path=/path/to/save/model/weights
+    output.path=/path/to/save/runs
     dataset.name=e2e 
     train.epochs=5 
     train.batch_size=128 
@@ -28,8 +28,8 @@ To train LoRA model(s) in the paper, run this command:
 
 ```commandline
 python train.py 
-    dataset.cache=/output/path/to/save/downloaded/dataset
-    output.path=/output/path/to/save/model/weights
+    dataset.cache=/path/to/save/downloaded/dataset
+    output.path=/path/to/save/runs
     dataset.name=e2e 
     train.epochs=5 
     train.batch_size=128 
@@ -45,8 +45,15 @@ by `dataset.cache`. The model will be saved in the path specified by `output.pat
 To visualize train/validation curves of model(s) in the paper, run:
 
 ```commandline
-tensorboard --logdir=/output/path/to/saved/model/weights
+tensorboard --logdir=/path/to/saved/runs
 ```
+
+To create figures of model(s) in the paper for e2e or eli5 dataset, run:
+
+```commandline
+python figures.py --fn /path/to/saved/runs/for/dataset/<dataset_name>
+```
+with `<dataset_name>` being `e2e_nlg` or `eli5`.
 
 ## Recreating the results
 To run all experiments in the paper simultaneously on SLURM, run:
