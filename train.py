@@ -13,14 +13,12 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from datasets import load_dataset
-from transformers import DataCollatorForLanguageModeling
+from transformers import DataCollatorForSeq2Seq
 from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
 
-from transformers import OpenAIGPTTokenizer, OpenAIGPTModel
-
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker
+    CudaMemoryTracker, preprocess_function
 
 import factorizednet as fn
 import pandas as pd
@@ -40,12 +38,15 @@ def get_dataloaders(args, tokenizer):
 
     train_dataset = load_dataset(
         args['dataset']['name'], split=train_split, cache_dir=args['dataset']['cache']
-    ).flatten()
+    )
+    # train_dataset = train_dataset[:2]
+
     num_train_pts, _ = train_dataset.shape
-    train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
+    # train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
+    train_dataset = train_dataset.select(range(100))
     valid_dataset = load_dataset(
         args['dataset']['name'], split=valid_split, cache_dir=args['dataset']['cache']
-    ).flatten()
+    )
 
     # Apply tokenizer to dataset
     train_tokenized = train_dataset.map(
@@ -74,32 +75,18 @@ def get_dataloaders(args, tokenizer):
         train_tokenized_reduced_grouped = train_tokenized_reduced
         valid_tokenized_reduced_grouped = valid_tokenized_reduced
 
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    # data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, return_tensors="pt", padding=True)
     train_dataloader = DataLoader(
         train_tokenized_reduced_grouped, shuffle=True, batch_size=args['train']['batch_size'], collate_fn=data_collator,
         pin_memory=True, num_workers=2
     )
+    # import pdb; pdb.set_trace()
+    # out = next(iter(train_dataloader))
     valid_dataloader = DataLoader(
         valid_tokenized_reduced_grouped, batch_size=args['train']['batch_size'], collate_fn=data_collator
     )
     return train_dataloader, valid_dataloader, valid_dataset
-
-
-def preprocess_function(examples, tokenizer, dataset_name="eli5", max_length=512):
-    """Concat all questions/answers into one text and tokenize them afterwards."""
-
-    if dataset_name == "eli5":
-        return tokenizer([" ".join(x) for x in examples["answers.text"]])
-    elif dataset_name == "e2e_nlg":
-        output = tokenizer(
-            [" ".join([x, y, tokenizer.eos_token]) for x, y in
-             zip(examples['meaning_representation'], examples['human_reference'])],
-            max_length=max_length,
-            truncation=True,
-        )
-        return output
-    else:
-        raise NotImplementedError
 
 
 def group_texts(examples, block_size=128):
@@ -172,7 +159,7 @@ def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_tr
     return model, optimizer, lr_scheduler
 
 
-def mark_only_mena_or_lora_as_trainable(model, verbose=False):
+def mark_only_rosa_or_lora_as_trainable(model, verbose=False):
     for name, param in model.named_parameters():
         if ("mena" in name and "fixed" not in name) or "lora" in name:
             param.requires_grad = True
@@ -215,8 +202,8 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
     # Get trainable parameters
     n_trainable_params = get_num_trainable_params(model)
 
-    if args['train']['mark_only_mena_or_lora_as_trainable'] and not args['fnmodel']['name'] == 'none':
-        mark_only_mena_or_lora_as_trainable(model, verbose=True)
+    if args['train']['mark_only_rosa_or_lora_as_trainable'] and not args['fnmodel']['name'] == 'none':
+        mark_only_rosa_or_lora_as_trainable(model, verbose=False)
 
     for i_step, batch in enumerate(train_dataloader):
 
@@ -238,6 +225,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
             n_trainable_params = get_num_trainable_params(model)
 
         # Forward pass
+        # import pdb; pdb.set_trace()
         outputs = model(batch["input_ids"], labels=batch['labels'])
         cuda_memory_tracker.track("[train_epoch] After forward")
         latency_report.stop(name="forward")
@@ -449,10 +437,11 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         outputs = model_fn.generate(
             inputs,
             max_length=args['train']['seq_len'],
-            num_beams=10,
+            num_beams=5,
             no_repeat_ngram_size=2,
             early_stopping=True,
-            pad_token_id=tokenizer.eos_token_id
+            pad_token_id=tokenizer.eos_token_id,
+            eos_token_id=tokenizer.eos_token_id
         )
         sample_str = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0].strip()
         writer.add_text('Sample', sample_str, i_epoch)

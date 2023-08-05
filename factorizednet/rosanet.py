@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import pandas as pd
 
-from factorizednet.factorized_module.factorized_linear import FactorizedLinear
+from factorizednet.factorized_module.rosa_linear import RosaLinear
 
 
 class RosaNet(nn.Module):
@@ -18,7 +18,7 @@ class RosaNet(nn.Module):
         assert (target is not None) == (steps is not None), "target and steps must be specified"
 
         self.factorized_modules = {
-            "Conv1D": FactorizedLinear  # Name of the linear module found in GPT2 models
+            "Conv1D": RosaLinear  # Name of the linear module found in GPT2 models
         }
         self.ignore = ignore if ignore is not None else list()
         self.run_stats = dict()

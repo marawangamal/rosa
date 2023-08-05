@@ -4,7 +4,7 @@ import torch.nn as nn
 from tensornet.compressor.factorized_module.factorized_layer import FactorizedLayer
 
 
-class FactorizedLinear(FactorizedLayer):
+class RosaLinear(FactorizedLayer):
     def __init__(self, in_features, out_features, bias=False, rank=1,
                  init_a_trainable=None, init_b_trainable=None, init_bias=None,
                  init_a_fixed=None, init_b_fixed=None, init_w_fixed=None):

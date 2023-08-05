@@ -260,3 +260,57 @@ class CudaMemoryTracker:
         strs = ["{} {:4d} MB".format(name, int(mem / (1024 * 1024))) for name, mem in self.memory_allocated.items()]
         strs = " | ".join(strs)
         return strs
+
+
+def preprocess_function(examples, tokenizer, dataset_name="eli5", max_length=512):
+    """Concat all questions/answers into one text and tokenize them afterwards."""
+
+    if dataset_name == "eli5":
+        return tokenizer([" ".join(x) for x in examples["answers.text"]])
+    elif dataset_name == "e2e_nlg":
+        output = tokenizer(
+            ["Input: {} Output: {} {}".format(x, y, tokenizer.eos_token) for x, y in
+             zip(examples['meaning_representation'], examples['human_reference'])],
+            max_length=max_length,
+            truncation=True,
+        )
+        output["labels"] = output["input_ids"].copy()
+        return output
+    else:
+        raise NotImplementedError
+
+
+def group_texts_old(examples, block_size=128):
+    # Concatenate all texts across batches. {ids: [List_1, .., List_N]} => [*List_1, ..., *List_N]
+    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+    total_length = len(concatenated_examples[list(examples.keys())[0]])
+
+    # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
+    # customize this part to your needs.
+    if total_length >= block_size:
+        total_length = (total_length // block_size) * block_size
+
+    # Split by chunks of block_size.
+    result = {
+        column_name: [column_vals[i: i + block_size] for i in range(0, total_length, block_size)]
+        for column_name, column_vals in concatenated_examples.items()
+    }
+
+    result["labels"] = result["input_ids"].copy()
+    return result
+
+
+def preprocess_function_old(examples, tokenizer, dataset_name="eli5", max_length=512):
+    """Concat all questions/answers into one text and tokenize them afterwards."""
+
+    if dataset_name == "eli5":
+        return tokenizer([" ".join(x) for x in examples["answers.text"]])
+    elif dataset_name == "e2e_nlg":
+        output = tokenizer(
+            [" ".join([x, y]) for x, y in zip(examples['meaning_representation'], examples['human_reference'])],
+            max_length=max_length,
+            truncation=True,
+        )
+        return output
+    else:
+        raise NotImplementedError

@@ -22,25 +22,26 @@ common_preamble_runs:
   - cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
 
 groups:
-#  - name: MET | E2E_NLG | LoRA vs. ROSA GPT2-S
-#    preamble:
-#      - "#SBATCH --gres=gpu:2"
-#      - export CUDA_VISIBLE_DEVICES=0,1
-#    paralleljobs:
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=none
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.0125
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.0250
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.0500
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.1000
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.2000
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.0125
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.0250
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.0500
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.1000
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0125
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0250
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0500
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.1000
+  - name: MET | E2E_NLG | LoRA vs. ROSA GPT2-S
+    preamble:
+      - "#SBATCH --gres=gpu:2"
+      - export CUDA_VISIBLE_DEVICES=0,1
+    paralleljobs:
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=none
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.0125
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.0250
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.0500
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.1000
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=lora fnmodel.params.rank=0.2000
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.0125
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.0250
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.0500
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.1000
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.name=rosa fnmodel.params.rank=0.2000
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0125
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0250
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0500
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.1000
 
 #  - name: MET | E2E_NLG | LoRA vs. ROSA GPT2-M
 #    preamble:
@@ -72,20 +73,20 @@ groups:
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-large fnmodel.name=rosa fnmodel.params.rank=0.0500
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-large fnmodel.name=rosa fnmodel.params.rank=0.1000
 
-  - name: MET | ELI5 | LoRA vs. ROSA GPT2-S
-    preamble:
-      - "#SBATCH --gres=gpu:2"
-      - export CUDA_VISIBLE_DEVICES=0,1,2,3
-    paralleljobs:
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=none
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.0125
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.0250
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.0500
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.1000
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.0125
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.0250
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.0500
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.1000
+#  - name: MET | ELI5 | LoRA vs. ROSA GPT2-S
+#    preamble:
+#      - "#SBATCH --gres=gpu:2"
+#      - export CUDA_VISIBLE_DEVICES=0,1,2,3
+#    paralleljobs:
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=none
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.0125
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.0250
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.0500
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=lora fnmodel.params.rank=0.1000
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.0125
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.0250
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.0500
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface dataset.name=eli5 train.epochs=5 train.batch_size=128 train.lr=1e-3 fnmodel.name=rosa fnmodel.params.rank=0.1000
 
 #  - name: MET | ELI5 | LoRA vs. ROSA GPT2-M
 #    preamble:

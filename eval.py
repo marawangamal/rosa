@@ -10,14 +10,15 @@ import math
 import logging
 import torch.nn as nn
 
-import hydra
-from omegaconf import DictConfig, OmegaConf
+import csv
+import argparse
+from tqdm import tqdm
+import string
 
 import torch
 
 from datasets import load_dataset
-from transformers import AutoTokenizer
-from transformers import AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 from utils import AverageMeter, load_object, BLEU
 
@@ -28,49 +29,12 @@ def get_dataloaders(args):
     # Load dataset
     assert args['dataset']['name'] in ["eli5", "e2e_nlg"], "Dataset not supported"
 
-    valid_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
+    test_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
 
-    valid_dataset = load_dataset(
-        args['dataset']['name'], split=valid_split, cache_dir=args['dataset']['cache']
+    test_dataset = load_dataset(
+        args['dataset']['name'], split=test_split, cache_dir=args['dataset']['cache']
     ).flatten()
-    # valid_dataset = valid_dataset.remove_columns(valid_dataset.column_names)
-    return valid_dataset
-
-
-def preprocess_function(examples, tokenizer, dataset_name="eli5", max_length=512):
-    """Concat all questions/answers into one text and tokenize them afterwards."""
-
-    if dataset_name == "eli5":
-        return tokenizer([" ".join(x) for x in examples["answers.text"]])
-    elif dataset_name == "e2e_nlg":
-        output = tokenizer(
-            [" ".join([x, y]) for x, y in zip(examples['meaning_representation'], examples['human_reference'])],
-            max_length=max_length,
-            truncation=True,
-        )
-        return output
-    else:
-        raise NotImplementedError
-
-
-def group_texts(examples, block_size=128):
-    # Concatenate all texts across batches. {ids: [List_1, .., List_N]} => [*List_1, ..., *List_N]
-    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-    total_length = len(concatenated_examples[list(examples.keys())[0]])
-
-    # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-    # customize this part to your needs.
-    if total_length >= block_size:
-        total_length = (total_length // block_size) * block_size
-
-    # Split by chunks of block_size.
-    result = {
-        column_name: [column_vals[i: i + block_size] for i in range(0, total_length, block_size)]
-        for column_name, column_vals in concatenated_examples.items()
-    }
-
-    result["labels"] = result["input_ids"].copy()
-    return result
+    return test_dataset
 
 
 def bpc_fn(inputs, outputs, targets):
@@ -102,69 +66,115 @@ def evaluate_fn(model, device, eval_dataloader, metric_fns):
     return {k: v.value for k, v in average_meters.items()}
 
 
-@hydra.main(version_base=None, config_path="./", config_name="lorank_configs")
-def main(cfg: DictConfig):
+# @hydra.main(version_base=None, config_path="./", config_name="configs")
+def main(eval_args):
     # Convert config to dict
-    eval_args = OmegaConf.to_container(cfg, resolve=True)
-    args = load_object(osp.join(eval_args['eval']['experiment'], "args.pkl"))
-
-    # Load dataset
-    # tokenizer, test_dataloader, test_dataset = get_dataloaders(args)
+    args = load_object(osp.join(eval_args.experiment, "args.pkl"))
 
     # Load model
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
+    # device = torch.device('cpu')
     model = AutoModelForCausalLM.from_pretrained(args['model']['name'])
     tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
     tokenizer.pad_token = tokenizer.eos_token
     test_dataset = get_dataloaders(args)
+    logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
 
     # Factorize model
-    logging.info("=> Using {} model ...".format(args['tnmodel']['name'].lower()))
-
-    # Regular model
     cmodel = {
         "factorized": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
-    }[args['tnmodel']['name'].lower()](model, **args['tnmodel']['params'])
-    dct_best = torch.load(osp.join(eval_args['eval']['experiment'], "model_best.pth"))
+    }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
+    dct_best = torch.load(osp.join(eval_args.experiment, "model_best.pth"))
     cmodel.load_state_dict(dct_best['model_state_dict'])
     cmodel.to(device)
 
     # Evaluate model
     logging.info("=> Evaluating model ...")
-
-    # Bleu score
     model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-    model_fn = model_fn.factorized_model if isinstance(model_fn, fn.RosaNet) else model_fn
-    model_fn = model_fn.factorized_model if isinstance(model_fn, fn.LoraNet) else model_fn
-    bleu_fn = BLEU(osp.join(eval_args['eval']['experiment'], "eval.csv"))
+    model_fn = model_fn.factorized_model if (isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) \
+        else model_fn
 
-    bleu_avg_meter = AverageMeter()
+    # predictor = pipeline('text-generation', model=model_fn, tokenizer=tokenizer)
+    #
+    if args['dataset']['name'] == "e2e_nlg":
 
-    for i, x in enumerate(test_dataset):
-        prompt = x['meaning_representation']
-        input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+        output_path_refs = osp.join(eval_args.experiment, "e2e_test_references.txt")
+        output_path_preds = osp.join(eval_args.experiment, "e2e_test_predictions.txt")
 
-        output_ids = model_fn.generate(
-            input_ids,
-            max_length=512,
-            num_beams=10,
-            no_repeat_ngram_size=2,
-            early_stopping=True,
-            pad_token_id=tokenizer.eos_token_id
-        )
+        with open(output_path_refs, "w", newline="") as f:
+            current_mr = ""
+            for i, datapoint in enumerate(tqdm(test_dataset, total=len(test_dataset))):
+                if datapoint['meaning_representation'] != current_mr:
+                    if i != 0:
+                        f.write("\n")
+                    current_mr = datapoint['meaning_representation']
+                hr_with_spaces = datapoint['human_reference'].translate(
+                    str.maketrans({key: " {0} ".format(key) for key in string.punctuation}))
+                f.write(hr_with_spaces + "\n")
+
+        with open(output_path_preds, "w", newline="") as f:
+            writer = csv.writer(f)
+            current_mr = ""
+            for datapoint in tqdm(test_dataset, total=len(test_dataset)):
+                if datapoint['meaning_representation'] != current_mr:
+                    current_mr = datapoint['meaning_representation'].replace('"', "")
+                    input_str = "Input: {} Output: ".format(current_mr)
+                    input_ids = tokenizer(input_str, return_tensors="pt").input_ids.to(device)
+                    output_ids = model_fn.generate(
+                        input_ids,
+                        max_length=512,
+                        num_beams=5,
+                        no_repeat_ngram_size=2,
+                        early_stopping=False,
+                        pad_token_id=tokenizer.eos_token_id,
+                        eos_token_id=tokenizer.eos_token_id
+                    )
+
+                    # Decode output
+                    output_str = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+                    output_str = output_str.replace(input_str, "").strip()
+                    if output_str == "":
+                        output_str = "NONE"
+
+                    # Write to CSV
+                    writer.writerow([output_str])
+
+    else:
+        raise NotImplementedError("Dataset {} not supported".format(args['dataset']['name']))
+
+    # bleu_fn = BLEU(output_path=osp.join(eval_args.experiment, "eval.csv"))
+    #
+    # bleu_avg_meter = AverageMeter()
+    #
+    # for i, x in enumerate(test_dataset):
+    #     prompt = x['meaning_representation']
+    #     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+    #
+    #     output_ids = model_fn.generate(
+    #         input_ids,
+    #         max_length=512,
+    #         num_beams=5,
+    #         no_repeat_ngram_size=2,
+    #         early_stopping=False,
+    #         pad_token_id=tokenizer.eos_token_id,
+    #         eos_token_id=tokenizer.eos_token_id
+    #     )
+        # print("*EOS Present: {}".format(tokenizer.eos_token_id in output_ids[0]))
         # output_ids = model_fn.generate(input_ids, max_length=512, num_beams=10,no_repeat_ngram_size=2, early_stopping=True, pad_token_id=tokenizer.eos_token_id)
 
         output_str = tokenizer.decode(output_ids[0])[len(tokenizer.decode(input_ids[0])):].strip()
-        results = bleu_fn(predictions=[output_str], references=[x['human_reference']], outpath=None)
-        bleu_avg_meter.add(results['bleu'])
-        print("[{}/{}] BLEU: {}\n\tPrompt: {}\n\tReference: {}\n\tOutput: {}".format(
-            i + 1, len(test_dataset), results['bleu'], prompt, x['human_reference'], output_str
-        ))
-
-    print("Evaluation finished! ({})".format(eval_args['eval']['experiment']))
-    print("=> (AVG) BLEU: {}".format(bleu_avg_meter.value))
+        # results = bleu_fn(predictions=[output_str], references=[x['human_reference']], outpath=None)
+        # bleu_avg_meter.add(results['bleu'])
+        # print("[{}/{}] BLEU: {}\n\tPrompt: {}\n\tReference: {}\n\tOutput: {}".format(
+        #     i + 1, len(test_dataset), results['bleu'], prompt, x['human_reference'], output_str
+        # ))
+    #
+    # print("Evaluation finished! ({})".format(eval_args.experiment))
+    # print("=> (AVG) BLEU: {}".format(bleu_avg_meter.value))
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e', '--experiment', type=str, required=True, help='Experiment directory')
+    args = parser.parse_args()
+    main(args)

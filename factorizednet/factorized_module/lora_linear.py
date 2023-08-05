@@ -96,7 +96,8 @@ class LoraLinear(nn.Module):
         cls = self.__class__.__name__
         return f'{cls}(a={self.lora_A.shape if self.rank > 0 else None}, ' \
                f'b={self.lora_B.shape if self.rank > 0 else None}, ' \
-               f'r={self.rank}, ' \
+               f'r={self.rank} ' \
+               f'bias={self.bias.shape if self.bias is not None else None}, ' \
                f'w={[self.weight.shape, self.weight.requires_grad]})'
 
     def forward(self, x: torch.Tensor):

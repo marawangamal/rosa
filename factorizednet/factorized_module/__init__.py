@@ -1,1 +1,1 @@
-from .factorized_linear import FactorizedLinear
+from .rosa_linear import RosaLinear

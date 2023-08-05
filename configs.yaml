@@ -5,7 +5,7 @@ train:
   batch_size: 8
   fraction: 1.0 # ratio of the training set to use
   seq_len: 512
-  mark_only_mena_or_lora_as_trainable: True
+  mark_only_rosa_or_lora_as_trainable: True
   optimizer:
     name: sgd # adam, adamw sgd
     params:
@@ -29,7 +29,7 @@ logging:
   input_size: [8, 512]  # used to compute latency [batch_size, seq_len]
   memory_info: True  # record memory usage
 output:
-  path: /home/mila/m/marawan.gamal/scratch/tensor-net/runs
+  path: /home/mila/m/marawan.gamal/scratch/rosa/runs
 dataset:
   name: e2e_nlg # options: eli5, e2e_nlg
   cache: /home/mila/m/marawan.gamal/.cache/huggingface

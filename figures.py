@@ -29,7 +29,7 @@ def rosa_random_vs_rosa_bottom_name_func(s):
     return name + f" (r={rank})"
 
 
-def rosa_vs_lora_plot_color_func(s, cmap_name="tab20", n_pts=12):
+def rosa_vs_lora_plot_color_func(s, cmap_name="tab20", n_pts=8):
 
     if "namenone" in s:
         return "black"
@@ -43,7 +43,7 @@ def rosa_vs_lora_plot_color_func(s, cmap_name="tab20", n_pts=12):
         cmap = plt.get_cmap("hsv")
         values = np.linspace(0, 1, n_pts)
         colors = cmap(values)[::-1]
-        random_color = colors[len(rank_color_map.items()) + 4 % len(colors)]
+        random_color = colors[len(rank_color_map.items()) + 1 % len(colors)]
 
         # colors = list(plt.cm.colors.CSS4_COLORS.keys())
         # random_color = random.choice(colors)
@@ -82,7 +82,7 @@ experiments = {
         "xticks": list(range(1, 6, 1)),
         "scalar_name": "valid/bpc",
         "plot_name_func": rosa_random_vs_rosa_bottom_name_func,
-        "plot_marker_func": lambda s: {"random": "o-", "bottom": "x--"}[s.split("_sa")[1].split("_")[0]],
+        "plot_marker_func": lambda s: {"random": "o-", "bottom": "^-."}[s.split("_sa")[1].split("_")[0]],
         "plot_color_func": rosa_vs_lora_plot_color_func,
         "regex": r'^(?=.*factorized)(?=.*gpt2_)|(?=.*namenone)(?=.*gpt2_).*',
     },
@@ -92,7 +92,7 @@ experiments = {
         "xticks": list(range(1, 6, 1)),
         "scalar_name": "valid/bpc",
         "plot_name_func": rosa_vs_lora_plot_name_func,
-        "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
+        "plot_marker_func": lambda s: {"rosa": "o-", "factorized": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
         "plot_color_func": rosa_vs_lora_plot_color_func,
         "regex": r'^(?=.*random)(?=.*gpt2-medium).*'
     },
@@ -102,7 +102,7 @@ experiments = {
         "xticks": list(range(1, 6, 1)),
         "scalar_name": "valid/bpc",
         "plot_name_func": rosa_vs_lora_plot_name_func,
-        "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-"}[
+        "plot_marker_func": lambda s: {"rosa": "o-", "factorized": "o-", "lora": "x--", "none": "s-"}[
             s.split("_name")[1].split("_")[0]],
         "plot_color_func": rosa_vs_lora_plot_color_func,
         "regex": r'^(?=.*random)(?=.*gpt2-large).*'
@@ -214,7 +214,7 @@ def main(dir_path, output_dir="figures"):
         df = pd.DataFrame(dct)
         df['trainable_params'] = df['trainable_params'].map(lambda x: x / 1e6)
         df = df.sort_values(by=['name'], ascending=True)
-        df['trainable_params'] = df['trainable_params'].round(1)
+        df['trainable_params'] = df['trainable_params'].round(3)
         df[exp_config['scalar_name']] = df[exp_config['scalar_name']].round(3)
         df = df.applymap(lambda x: f"{x:.2f}".rstrip('0').rstrip('.') if isinstance(x, float) else x)
         latex_table = df.to_latex(index=False)
