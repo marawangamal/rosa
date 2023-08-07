@@ -4,7 +4,7 @@ Example:
 python eval_lorank.py eval.experiment=runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9_w0.01_nanone_nu100_namdistillgpt2_namelora_r0.1_leepoch_srandom_t0
 
 """
-
+import os
 import os.path as osp
 import math
 import logging
@@ -34,7 +34,7 @@ def get_data(experiment_args):
     ).flatten()
     return test_dataset
 
-
+# https://stackoverflow.com/questions/76465343/huggingface-transformers-model-config-reported-this-is-a-deprecated-strategy-to
 # @hydra.main(version_base=None, config_path="./", config_name="configs")
 def evaluate_experiment(experiment_root):
     # Convert config to dict
@@ -51,7 +51,7 @@ def evaluate_experiment(experiment_root):
 
     # Factorize model
     cmodel = {
-        "factorized": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
+        "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
     }[experiment_args['fnmodel']['name'].lower()](model, **experiment_args['fnmodel']['params'])
     dct_best = torch.load(osp.join(experiment_root, "model_best.pth"))
     cmodel.load_state_dict(dct_best['model_state_dict'])
@@ -118,10 +118,20 @@ def evaluate_experiment(experiment_root):
 
 
 def main(args):
-    evaluate_experiment(args.experiment)
+
+    if args.experiment == '':
+        experiments = [osp.join(args.root, d) for d in os.listdir(args.root) if osp.isdir(osp.join(args.root, d))]
+        for experiment in experiments:
+            evaluate_experiment(experiment)
+    else:
+        evaluate_experiment(args.experiment)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', '--experiment', type=str, required=True, help='Experiment directory')
+    parser.add_argument('-e', '--experiment', type=str, default='', required=False, help='Experiment directory')
+    parser.add_argument('-r', '--root', type=str, default='', help='Root directory')
     args = parser.parse_args()
+
+    assert args.experiment != '' or args.root != '', "Either experiment or root must be specified"
     main(args)
