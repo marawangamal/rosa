@@ -27,22 +27,22 @@ class RosaLinear(FactorizedLayer):
 
         if init_a_trainable is not None:
 
-            self.mena_a_trainable = nn.Parameter(init_a_trainable)
-            self.mena_b_trainable = nn.Parameter(init_b_trainable)
+            self.rosa_a_trainable = nn.Parameter(init_a_trainable)
+            self.rosa_b_trainable = nn.Parameter(init_b_trainable)
 
-            self.mena_w_fixed = nn.Parameter(init_w_fixed, requires_grad=False) if init_w_fixed is not None else None
-            self.mena_a_fixed = nn.Parameter(init_a_fixed, requires_grad=False) if init_a_fixed is not None else None
-            self.mena_b_fixed = nn.Parameter(init_b_fixed, requires_grad=False) if init_b_fixed is not None else None
+            self.rosa_w_fixed = nn.Parameter(init_w_fixed, requires_grad=False) if init_w_fixed is not None else None
+            self.rosa_a_fixed = nn.Parameter(init_a_fixed, requires_grad=False) if init_a_fixed is not None else None
+            self.rosa_b_fixed = nn.Parameter(init_b_fixed, requires_grad=False) if init_b_fixed is not None else None
 
         else:
-            self.mena_a_trainable = nn.Parameter(torch.randn((in_features, self.rank)))
-            self.mena_b_trainable = nn.Parameter(torch.randn((self.rank, out_features)))
-            self.mena_a_fixed, self.mena_b_fixed, self.mena_w_fixed = None, None, None
+            self.rosa_a_trainable = nn.Parameter(torch.randn((in_features, self.rank)))
+            self.rosa_b_trainable = nn.Parameter(torch.randn((self.rank, out_features)))
+            self.rosa_a_fixed, self.rosa_b_fixed, self.rosa_w_fixed = None, None, None
 
         if init_bias is not None:
-            self.mena_bias = nn.Parameter(init_bias)
+            self.rosa_bias = nn.Parameter(init_bias)
         elif bias:
-            self.mena_bias = nn.Parameter(torch.zeros((out_features, 1)))
+            self.rosa_bias = nn.Parameter(torch.zeros((out_features, 1)))
 
     @classmethod
     def from_module(cls, linear_layer, fan_in_fan_out=True):
@@ -77,14 +77,16 @@ class RosaLinear(FactorizedLayer):
         Returns:
             A FactorizedLinearMaskedGradient layer
         """
-        in_feat, out_feat = state_dict['a_trainable'].size(0), state_dict['b_trainable'].size(1)
+        # import pdb; pdb.set_trace()
+        # in_feat, out_feat = state_dict['rosa_a_trainable'].size(0), state_dict['rosa_b_trainable'].size(1)
 
-        init_a_trainable = state_dict['mena_a_trainable']
-        init_b_trainable = state_dict['mena_b_trainable']
-        init_a_fixed = state_dict['mena_a_fixed'] if "mena_a_fixed" in state_dict is not None else None
-        init_b_fixed = state_dict['mena_b_fixed'] if "mena_b_fixed" in state_dict is not None else None
-        init_w_fixed = state_dict['mena_w_fixed'] if "mena_w_fixed" in state_dict is not None else None
-        init_bias = state_dict['mena_bias'] if "mena_bias" in state_dict is not None else None
+        init_a_trainable = state_dict['rosa_a_trainable']
+        init_b_trainable = state_dict['rosa_b_trainable']
+        in_feat, out_feat = init_a_trainable.size(0), init_b_trainable.size(1)
+        init_a_fixed = state_dict['rosa_a_fixed'] if "rosa_a_fixed" in state_dict is not None else None
+        init_b_fixed = state_dict['rosa_b_fixed'] if "rosa_b_fixed" in state_dict is not None else None
+        init_w_fixed = state_dict['rosa_w_fixed'] if "rosa_w_fixed" in state_dict is not None else None
+        init_bias = state_dict['rosa_bias'] if "rosa_bias" in state_dict is not None else None
 
         return self.__class__(
             in_features=in_feat, out_features=out_feat,
@@ -94,14 +96,14 @@ class RosaLinear(FactorizedLayer):
 
     @property
     def a_weight(self):
-        return torch.cat([self.mena_a_trainable, self.mena_a_fixed], dim=1) if self.mena_a_fixed \
-                                                                               is not None else self.mena_a_trainable
+        return torch.cat([self.rosa_a_trainable, self.rosa_a_fixed], dim=1) if self.rosa_a_fixed \
+                                                                               is not None else self.rosa_a_trainable
 
     @property
     def b_weight(self):
         try:
-            return torch.cat([self.mena_b_trainable, self.mena_b_fixed], dim=0) if self.mena_b_fixed \
-                                                                                   is not None else self.mena_b_trainable
+            return torch.cat([self.rosa_b_trainable, self.rosa_b_fixed], dim=0) if self.rosa_b_fixed \
+                                                                                   is not None else self.rosa_b_trainable
         except:
             import pdb;
             pdb.set_trace()
@@ -130,8 +132,8 @@ class RosaLinear(FactorizedLayer):
             if method == 'random':
 
                 if collapse_fixed:
-                    w_tot = self.mena_a_trainable @ self.mena_b_trainable
-                    w_tot = w_tot + self.mena_w_fixed if self.mena_w_fixed is not None else w_tot
+                    w_tot = self.rosa_a_trainable @ self.rosa_b_trainable
+                    w_tot = w_tot + self.rosa_w_fixed if self.rosa_w_fixed is not None else w_tot
                     u, s, vt = torch.linalg.svd(w_tot, full_matrices=False)
                     a = torch.sqrt(s).reshape(1, -1) * u  # [in_f, full_rank]
                     b = torch.sqrt(s).reshape(-1, 1) * vt  # [full_rank, out_f]
@@ -141,7 +143,7 @@ class RosaLinear(FactorizedLayer):
                     b = self.b_weight.data  # [full_rank, out_f]
 
                 full_rank = a.size(1)
-                bias = self.mena_bias.data if self.mena_bias is not None else None
+                bias = self.rosa_bias.data if self.rosa_bias is not None else None
 
                 if rank < 1:  # rank interpreted as a ratio
                     start_idx = torch.randint(0, full_rank - self.ratio2int(rank, full_rank), (1,)).item()
@@ -157,8 +159,8 @@ class RosaLinear(FactorizedLayer):
             elif method == 'bottom':
 
                 if collapse_fixed:
-                    w_tot = self.mena_a_trainable @ self.mena_b_trainable
-                    w_tot = w_tot + self.mena_w_fixed if self.mena_w_fixed is not None else w_tot
+                    w_tot = self.rosa_a_trainable @ self.rosa_b_trainable
+                    w_tot = w_tot + self.rosa_w_fixed if self.rosa_w_fixed is not None else w_tot
                     u, s, vt = torch.linalg.svd(w_tot, full_matrices=False)
                     a = torch.sqrt(s).reshape(1, -1) * u  # [in_f, r]
                     b = torch.sqrt(s).reshape(-1, 1) * vt  # [r, out_f]
@@ -172,7 +174,7 @@ class RosaLinear(FactorizedLayer):
                     b = torch.sqrt(s).reshape(-1, 1) * vt  # [r, out_f]
 
                 full_rank = a.size(1)
-                bias = self.mena_bias.data if self.mena_bias is not None else None
+                bias = self.rosa_bias.data if self.rosa_bias is not None else None
 
                 start_idx = max(len(s) - self.ratio2int(rank, full_rank) - 1, 0) if rank < 1 else max(len(s) - rank, 0)
                 grad_indices = torch.arange(start_idx, len(s))
@@ -202,11 +204,11 @@ class RosaLinear(FactorizedLayer):
 
     def __repr__(self):
         cls = self.__class__.__name__
-        return f'{cls}(rank={self.rank}, at={self.mena_a_trainable.shape}, bt={self.mena_b_trainable.shape}, ' \
-               f'af={[self.mena_a_fixed.shape, self.mena_a_fixed.requires_grad] if self.mena_a_fixed is not None else None}, ' \
-               f'bf={[self.mena_b_fixed.shape, self.mena_b_fixed.requires_grad] if self.mena_b_fixed is not None else None}, ' \
-               f'wf={[self.mena_w_fixed.shape, self.mena_w_fixed.requires_grad] if self.mena_w_fixed is not None else None}, ' \
-               f'bias={[self.mena_bias.shape, self.mena_bias.requires_grad] if self.mena_bias is not None else None}) '
+        return f'{cls}(rank={self.rank}, at={self.rosa_a_trainable.shape}, bt={self.rosa_b_trainable.shape}, ' \
+               f'af={[self.rosa_a_fixed.shape, self.rosa_a_fixed.requires_grad] if self.rosa_a_fixed is not None else None}, ' \
+               f'bf={[self.rosa_b_fixed.shape, self.rosa_b_fixed.requires_grad] if self.rosa_b_fixed is not None else None}, ' \
+               f'wf={[self.rosa_w_fixed.shape, self.rosa_w_fixed.requires_grad] if self.rosa_w_fixed is not None else None}, ' \
+               f'bias={[self.rosa_bias.shape, self.rosa_bias.requires_grad] if self.rosa_bias is not None else None}) '
 
     def forward(self, x):
         """ Forward pass
@@ -219,15 +221,15 @@ class RosaLinear(FactorizedLayer):
         """
 
         x_shape = x.shape
-        if self.mena_w_fixed is not None:  # collapsed fixed weights
-            x = x.reshape(*x_shape[:-1], self.in_features) @ self.mena_w_fixed + \
-                (x.reshape(*x_shape[:-1], self.in_features) @ self.mena_a_trainable) @ self.mena_b_trainable
+        if self.rosa_w_fixed is not None:  # collapsed fixed weights
+            x = x.reshape(*x_shape[:-1], self.in_features) @ self.rosa_w_fixed + \
+                (x.reshape(*x_shape[:-1], self.in_features) @ self.rosa_a_trainable) @ self.rosa_b_trainable
 
-        elif self.mena_a_fixed is not None:
-            x = (x.reshape(*x_shape[:-1], self.in_features) @ self.mena_a_fixed) @ self.mena_b_fixed \
-                + (x.reshape(*x_shape[:-1], self.in_features) @ self.mena_a_trainable) @ self.mena_b_trainable
+        elif self.rosa_a_fixed is not None:
+            x = (x.reshape(*x_shape[:-1], self.in_features) @ self.rosa_a_fixed) @ self.rosa_b_fixed \
+                + (x.reshape(*x_shape[:-1], self.in_features) @ self.rosa_a_trainable) @ self.rosa_b_trainable
 
         else:  # no fixed weights
-            x = (x.reshape(*x_shape[:-1], self.in_features) @ self.mena_a_trainable) @ self.mena_b_trainable
+            x = (x.reshape(*x_shape[:-1], self.in_features) @ self.rosa_a_trainable) @ self.rosa_b_trainable
 
-        return x.reshape(*x_shape[:-1], self.out_features) if self.mena_bias is None else x + self.mena_bias
+        return x.reshape(*x_shape[:-1], self.out_features) if self.rosa_bias is None else x + self.rosa_bias
