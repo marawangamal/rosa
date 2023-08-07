@@ -122,8 +122,10 @@ def main(args):
     if args.experiment == '':
         experiments = [osp.join(args.root, d) for d in os.listdir(args.root) if osp.isdir(osp.join(args.root, d))]
         for experiment in experiments:
+            print("Generating predictions for experiment {}".format(experiment))
             evaluate_experiment(experiment)
     else:
+        print("Generating predictions for experiment {}".format(args.experiment))
         evaluate_experiment(args.experiment)
 
 
