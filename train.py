@@ -307,7 +307,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
 
         epoch_start_time = time.time()
-        # FactorizedNet Mask gradients
+
+        # Mask gradients of RosaNet
         if args['fnmodel']['name'] == "rosa" and args['fnmodel']['params']['level'] == "epoch":
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
             cmodel, optimizer, lr_scheduler = sample_trainable(
@@ -345,7 +346,6 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         # Save model checkpoint
         if best_valid_metrics is None or valid_metrics['loss'] < best_valid_metrics['loss']:
             # Compute here for convenience
-            # test_metrics = evaluate(model, test_dataloader, criterion, device=device)
 
             try:
                 model_state_dict = cmodel.module.state_dict()
@@ -357,9 +357,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 'optimizer_state_dict': optimizer.state_dict(),
                 'model_state_dict': model_state_dict,
                 'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': valid_metrics,
+                'train_metrics': train_metrics,
                 'valid_metrics': valid_metrics,
-                # 'test_metrics': test_metrics,
                 'baseline_runtime_metrics': baseline_runtime_metrics,
                 'factorized_runtime_metrics': factorized_runtime_metrics,
                 'config': args
@@ -373,16 +372,14 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 'optimizer_state_dict': optimizer.state_dict(),
                 'model_state_dict': model_state_dict,
                 'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': valid_metrics,
+                'train_metrics': train_metrics,
                 'valid_metrics': valid_metrics,
-                # 'test_metrics': test_metrics,
                 'baseline_runtime_metrics': baseline_runtime_metrics,
                 'factorized_runtime_metrics': factorized_runtime_metrics,
                 'config': args
             }, osp.join(output_path, "model_latest.pth"))
 
         elif i_epoch % 5 == 0 or i_epoch == args["train"]["epochs"]:
-            # test_metrics = evaluate(model, test_dataloader, criterion, device=device)
 
             try:
                 model_state_dict = cmodel.module.state_dict()
@@ -394,9 +391,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 'optimizer_state_dict': optimizer.state_dict(),
                 'model_state_dict': model_state_dict,
                 'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': valid_metrics,
+                'train_metrics': train_metrics,
                 'valid_metrics': valid_metrics,
-                # 'test_metrics': test_metrics,
                 'baseline_runtime_metrics': baseline_runtime_metrics,
                 'factorized_runtime_metrics': factorized_runtime_metrics,
                 'config': args
