@@ -94,8 +94,15 @@ def main(eval_args):
     model_fn = model_fn.factorized_model if (isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) \
         else model_fn
 
-    # predictor = pipeline('text-generation', model=model_fn, tokenizer=tokenizer)
-    #
+    predictor = pipeline(
+        'text-generation',
+        model=model_fn,
+        tokenizer=tokenizer,
+        device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'),
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
     if args['dataset']['name'] == "e2e_nlg":
 
         output_path_refs = osp.join(eval_args.experiment, "e2e_test_references.txt")
@@ -119,20 +126,18 @@ def main(eval_args):
                 if datapoint['meaning_representation'] != current_mr:
                     current_mr = datapoint['meaning_representation'].replace('"', "")
                     input_str = "Input: {} Output: ".format(current_mr)
-                    input_ids = tokenizer(input_str, return_tensors="pt").input_ids.to(device)
-                    output_ids = model_fn.generate(
-                        input_ids,
-                        max_length=512,
-                        num_beams=5,
-                        no_repeat_ngram_size=2,
-                        early_stopping=False,
-                        pad_token_id=tokenizer.eos_token_id,
-                        eos_token_id=tokenizer.eos_token_id
-                    )
 
-                    # Decode output
-                    output_str = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-                    output_str = output_str.replace(input_str, "").strip()
+                    output_str = predictor(
+                        input_str,
+                        return_full_text=False,
+                        length_penalty=0.8,
+                        no_repeat_ngram_size=4,
+                        repetition_penalty=1.0,
+                        num_beams=10,
+                        num_return_sequences=1,
+                        max_length=512,
+                    )[0]['generated_text'].strip().replace("\xa0", " ")
+
                     if output_str == "":
                         output_str = "NONE"
 
@@ -142,35 +147,6 @@ def main(eval_args):
     else:
         raise NotImplementedError("Dataset {} not supported".format(args['dataset']['name']))
 
-    # bleu_fn = BLEU(output_path=osp.join(eval_args.experiment, "eval.csv"))
-    #
-    # bleu_avg_meter = AverageMeter()
-    #
-    # for i, x in enumerate(test_dataset):
-    #     prompt = x['meaning_representation']
-    #     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-    #
-    #     output_ids = model_fn.generate(
-    #         input_ids,
-    #         max_length=512,
-    #         num_beams=5,
-    #         no_repeat_ngram_size=2,
-    #         early_stopping=False,
-    #         pad_token_id=tokenizer.eos_token_id,
-    #         eos_token_id=tokenizer.eos_token_id
-    #     )
-        # print("*EOS Present: {}".format(tokenizer.eos_token_id in output_ids[0]))
-        # output_ids = model_fn.generate(input_ids, max_length=512, num_beams=10,no_repeat_ngram_size=2, early_stopping=True, pad_token_id=tokenizer.eos_token_id)
-
-        output_str = tokenizer.decode(output_ids[0])[len(tokenizer.decode(input_ids[0])):].strip()
-        # results = bleu_fn(predictions=[output_str], references=[x['human_reference']], outpath=None)
-        # bleu_avg_meter.add(results['bleu'])
-        # print("[{}/{}] BLEU: {}\n\tPrompt: {}\n\tReference: {}\n\tOutput: {}".format(
-        #     i + 1, len(test_dataset), results['bleu'], prompt, x['human_reference'], output_str
-        # ))
-    #
-    # print("Evaluation finished! ({})".format(eval_args.experiment))
-    # print("=> (AVG) BLEU: {}".format(bleu_avg_meter.value))
 
 
 if __name__ == '__main__':
