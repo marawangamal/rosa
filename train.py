@@ -42,8 +42,8 @@ def get_dataloaders(args, tokenizer):
     # train_dataset = train_dataset[:2]
 
     num_train_pts, _ = train_dataset.shape
-    # train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
-    train_dataset = train_dataset.select(range(100))
+    train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
+    # train_dataset = train_dataset.select(range(100))
     valid_dataset = load_dataset(
         args['dataset']['name'], split=valid_split, cache_dir=args['dataset']['cache']
     )
