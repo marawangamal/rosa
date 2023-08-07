@@ -17,74 +17,43 @@ import string
 
 import torch
 
+import factorizednet as fn
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-
-from utils import AverageMeter, load_object, BLEU
-
-import factorizednet as fn
+from utils import load_object
 
 
-def get_dataloaders(args):
+def get_data(experiment_args):
     # Load dataset
-    assert args['dataset']['name'] in ["eli5", "e2e_nlg"], "Dataset not supported"
+    assert experiment_args['dataset']['name'] in ["eli5", "e2e_nlg"], "Dataset not supported"
 
-    test_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
+    test_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[experiment_args['dataset']['name']]
 
     test_dataset = load_dataset(
-        args['dataset']['name'], split=test_split, cache_dir=args['dataset']['cache']
+        experiment_args['dataset']['name'], split=test_split, cache_dir=experiment_args['dataset']['cache']
     ).flatten()
     return test_dataset
 
 
-def bpc_fn(inputs, outputs, targets):
-    # Compute bpc
-    loss = outputs.loss.mean()
-    bpc = (loss / math.log(2))
-    return bpc
-
-
-def ppl_fn(inputs, outputs, targets):
-    # Compute ppl
-    loss = outputs.loss.mean()
-    ppl = torch.exp(loss)
-    return ppl
-
-
-def evaluate_fn(model, device, eval_dataloader, metric_fns):
-    with torch.no_grad():
-
-        average_meters = {k: AverageMeter() for k in metric_fns.keys()}
-
-        for batch in eval_dataloader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(batch["input_ids"], labels=batch['labels'])
-
-            for k in metric_fns.keys():
-                average_meters[k].add(metric_fns[k](batch['input_ids'], batch['labels'], outputs))
-
-    return {k: v.value for k, v in average_meters.items()}
-
-
 # @hydra.main(version_base=None, config_path="./", config_name="configs")
-def main(eval_args):
+def evaluate_experiment(experiment_root):
     # Convert config to dict
-    args = load_object(osp.join(eval_args.experiment, "args.pkl"))
+    experiment_args = load_object(osp.join(experiment_root, "args.pkl"))
 
     # Load model
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # device = torch.device('cpu')
-    model = AutoModelForCausalLM.from_pretrained(args['model']['name'])
-    tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
+    model = AutoModelForCausalLM.from_pretrained(experiment_args['model']['name'])
+    tokenizer = AutoTokenizer.from_pretrained(experiment_args['model']['name'])
     tokenizer.pad_token = tokenizer.eos_token
-    test_dataset = get_dataloaders(args)
-    logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
+    test_dataset = get_data(experiment_args)
+    logging.info("=> Using {} model ...".format(experiment_args['fnmodel']['name'].lower()))
 
     # Factorize model
     cmodel = {
         "factorized": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
-    }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
-    dct_best = torch.load(osp.join(eval_args.experiment, "model_best.pth"))
+    }[experiment_args['fnmodel']['name'].lower()](model, **experiment_args['fnmodel']['params'])
+    dct_best = torch.load(osp.join(experiment_root, "model_best.pth"))
     cmodel.load_state_dict(dct_best['model_state_dict'])
     cmodel.to(device)
 
@@ -103,10 +72,10 @@ def main(eval_args):
         eos_token_id=tokenizer.eos_token_id,
     )
 
-    if args['dataset']['name'] == "e2e_nlg":
+    if experiment_args['dataset']['name'] == "e2e_nlg":
 
-        output_path_refs = osp.join(eval_args.experiment, "e2e_test_references.txt")
-        output_path_preds = osp.join(eval_args.experiment, "e2e_test_predictions.txt")
+        output_path_refs = osp.join(experiment_root, "e2e_test_references.txt")
+        output_path_preds = osp.join(experiment_root, "e2e_test_predictions.txt")
 
         with open(output_path_refs, "w", newline="") as f:
             current_mr = ""
@@ -145,9 +114,11 @@ def main(eval_args):
                     writer.writerow([output_str])
 
     else:
-        raise NotImplementedError("Dataset {} not supported".format(args['dataset']['name']))
+        raise NotImplementedError("Dataset {} not supported".format(experiment_args['dataset']['name']))
 
 
+def main(args):
+    evaluate_experiment(args.experiment)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

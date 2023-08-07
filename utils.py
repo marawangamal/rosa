@@ -5,9 +5,6 @@ from csv import writer
 import torch
 import yaml
 from enum import Enum
-
-import evaluate
-
 import numpy as np
 
 
@@ -202,21 +199,6 @@ def write2csv(row: list, output_path: str, write_mode='a'):
         writer_object = writer(f_object)
         writer_object.writerow(row)
         f_object.close()
-
-
-class BLEU:
-    def __init__(self, output_path: str, *args, **kwargs):
-        # self.bleu = evaluate.load("bleu")
-        self.bleu = evaluate.load("sacrebleu")
-        self.output_path = output_path
-        write2csv(["predictions", "references", "BLEU"], self.output_path, write_mode='w')
-
-    def __call__(self, predictions: list, references: list, *args, **kwargs):
-        results = self.bleu.compute(predictions=predictions, references=references)
-        results['bleu'] = results['score']
-        write2csv([predictions, references, results['bleu']], self.output_path)
-
-        return results
 
 
 class LatencyReport:

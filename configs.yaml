@@ -1,13 +1,13 @@
 runs: 1
 train:
   epochs: 5
-  lr: 0.0002
-  batch_size: 8
+  lr: 0.00005
+  batch_size: 10
   fraction: 1.0 # ratio of the training set to use
   seq_len: 512
   mark_only_rosa_or_lora_as_trainable: True
   optimizer:
-    name: sgd # adam, adamw sgd
+    name: adamw # adam, adamw sgd
     params:
       momentum: 0.9
       weight_decay: 0.01
