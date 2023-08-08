@@ -5,9 +5,19 @@ from tensornet.compressor.factorized_module.factorized_layer import FactorizedLa
 
 
 class RosaLinear(FactorizedLayer):
-    def __init__(self, in_features, out_features, bias=False, rank=1,
-                 init_a_trainable=None, init_b_trainable=None, init_bias=None,
-                 init_a_fixed=None, init_b_fixed=None, init_w_fixed=None):
+    def __init__(
+            self,
+            in_features,
+            out_features,
+            bias=False,
+            rank=1,
+            init_a_trainable=None,
+            init_b_trainable=None,
+            init_a_fixed=None,
+            init_b_fixed=None,
+            init_w_fixed=None,
+            init_bias=None,
+    ):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -77,8 +87,6 @@ class RosaLinear(FactorizedLayer):
         Returns:
             A FactorizedLinearMaskedGradient layer
         """
-        # import pdb; pdb.set_trace()
-        # in_feat, out_feat = state_dict['rosa_a_trainable'].size(0), state_dict['rosa_b_trainable'].size(1)
 
         init_a_trainable = state_dict['rosa_a_trainable']
         init_b_trainable = state_dict['rosa_b_trainable']
@@ -89,9 +97,14 @@ class RosaLinear(FactorizedLayer):
         init_bias = state_dict['rosa_bias'] if "rosa_bias" in state_dict is not None else None
 
         return self.__class__(
-            in_features=in_feat, out_features=out_feat,
-            init_a_trainable=init_a_trainable, init_b_trainable=init_b_trainable,
-            init_a_fixed=init_a_fixed, init_b_fixed=init_b_fixed, init_bias=init_bias, init_w_fixed=init_w_fixed
+            in_features=in_feat,
+            out_features=out_feat,
+            init_a_trainable=init_a_trainable,
+            init_b_trainable=init_b_trainable,
+            init_a_fixed=init_a_fixed,
+            init_b_fixed=init_b_fixed,
+            init_w_fixed=init_w_fixed,
+            init_bias=init_bias,
         )
 
     @property

@@ -161,7 +161,7 @@ def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_tr
 
 def mark_only_rosa_or_lora_as_trainable(model, verbose=False):
     for name, param in model.named_parameters():
-        if ("mena" in name and "fixed" not in name) or "lora" in name:
+        if ("rosa" in name and "fixed" not in name) or "lora" in name:
             param.requires_grad = True
             if verbose:
                 print("+ Marked {} as trainable".format(name))
