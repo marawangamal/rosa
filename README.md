@@ -15,13 +15,14 @@ To train ROSA/LoRA model(s) in the paper, run this command:
 
 ```commandline
 python train.py 
-    dataset.cache=/path/to/save/downloaded/dataset
-    output.path=/path/to/saved/runs
-    dataset.name=e2e 
+    dataset.cache=/path/to/save/downloaded/dataset # path to save downloaded dataset
+    output.path=/path/to/saved/runs  # path to save model checkpoints
+    dataset.name=e2e # e2e or eli5
+    model.name=gpt2  # gpt2, gpt2-medium, gpt2-large, gpt2-xl
+    fnmodel.name=rosa # rosa or lora
     train.epochs=5 
-    train.batch_size=128 
-    train.lr=1e-3 
-    fnmodel.name=<rosa or lora>
+    train.batch_size=10 
+    train.lr=5e-5
 ```
 
 The E2E or ELI5 dataset will be downloaded and cached in the path specified 
