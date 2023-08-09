@@ -33,9 +33,9 @@ by `dataset.cache`. The model will be saved in the path specified by `output.pat
 To evaluate test metrics for all models, run the following commands:
 
 ```commandline
-python eval.py path/to/saved/runs // generate predictions 
+python eval.py -r path/to/saved/runs // generate predictions 
 bash eval.sh path/to/saved/runs // compute metrics
-python compile_results.py path/to/saved/runs // compile results of all models
+python compile.py path/to/saved/runs // compile results of all models
 ```
 
 with `path/to/saved/runs` being the root containing the saved runs of the model(s) in the paper.
