@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from tensornet.compressor.factorized_module.factorized_layer import FactorizedLayer
+from .factorized_layer import FactorizedLayer
 
 
 class RosaLinear(FactorizedLayer):
