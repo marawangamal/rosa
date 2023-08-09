@@ -30,11 +30,14 @@ by `dataset.cache`. The model will be saved in the path specified by `output.pat
 
 ## Evaluation
 
-To evaluate test metrics for all models, run the following commands:
+To evaluate test metrics for all models, first clone the 
+[e2e-metrics](https://github.com/tuetschek/e2e-metrics/tree/master) repository. 
+Then, run the following commands:
 
 ```commandline
+export E2E_METRICS_EXEC=/path/to/e2e-metrics/measure_scores.py
 python eval.py -r path/to/saved/runs // generate predictions 
-bash eval.sh path/to/saved/runs // compute metrics
+bash eval.sh $E2E_METRICS_EXEC -p path/to/saved/runs // evaluate predictions
 python compile.py path/to/saved/runs // compile results of all models
 ```
 

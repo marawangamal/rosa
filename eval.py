@@ -93,7 +93,7 @@ def evaluate_experiment(experiment_root):
             current_mr = ""
             for datapoint in tqdm(test_dataset, total=len(test_dataset)):
                 if datapoint['meaning_representation'] != current_mr:
-                    current_mr = datapoint['meaning_representation'].replace('"', "")
+                    current_mr = datapoint['meaning_representation']
                     input_str = "Input: {} Output: ".format(current_mr)
 
                     output_str = predictor(
@@ -105,6 +105,7 @@ def evaluate_experiment(experiment_root):
                         num_beams=10,
                         num_return_sequences=1,
                         max_length=512,
+                        early_stopping=True,
                     )[0]['generated_text'].strip().replace("\xa0", " ")
 
                     if output_str == "":
