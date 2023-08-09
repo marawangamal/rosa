@@ -1,8 +1,13 @@
 import os
+import sys
 import pandas as pd
 
-# Define the root directory
-root = '.'
+# Get the root directory from the command line arguments
+if len(sys.argv) < 2:
+    print("Usage: python compile.py <root_directory>")
+    sys.exit(1)
+
+root = sys.argv[1]
 
 # Define the output CSV file
 output_csv = 'results.csv'

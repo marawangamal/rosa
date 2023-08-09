@@ -132,7 +132,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--experiment', type=str, default='', required=False, help='Experiment directory')
-    parser.add_argument('-r', '--root', type=str, default='', help='Root directory')
+    parser.add_argument('-r', '--root', type=str, default='', help='Root directory of many experiments')
     args = parser.parse_args()
 
     assert args.experiment != '' or args.root != '', "Either experiment or root must be specified"
