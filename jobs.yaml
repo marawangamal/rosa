@@ -27,17 +27,17 @@ groups:
       - "#SBATCH --gres=gpu:2"
       - export CUDA_VISIBLE_DEVICES=0,1
     paralleljobs:
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=0.0125
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=0.0250
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=0.0500
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=0.1000
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=0.2000
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.0125
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.0250
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.0500
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.1000
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.2000
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.0125
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.0250
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.0500
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.1000
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=0.2000
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0125
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0250
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0500
