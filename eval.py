@@ -53,7 +53,7 @@ def evaluate_experiment(experiment_root):
     cmodel = {
         "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
     }[experiment_args['fnmodel']['name'].lower()](model, **experiment_args['fnmodel']['params'])
-    dct_best = torch.load(osp.join(experiment_root, "model_best.pth"))
+    dct_best = torch.load(osp.join(experiment_root, "model_latest.pth"))
     cmodel.load_state_dict(dct_best['model_state_dict'])
     cmodel.to(device)
 
@@ -99,13 +99,11 @@ def evaluate_experiment(experiment_root):
                     output_str = predictor(
                         input_str,
                         return_full_text=False,
-                        length_penalty=0.8,
+                        # length_penalty=0.8,
                         no_repeat_ngram_size=4,
-                        repetition_penalty=1.0,
-                        num_beams=10,
-                        num_return_sequences=1,
+                        num_beams=5,
                         max_length=512,
-                        early_stopping=True,
+                        # early_stopping=True,
                     )[0]['generated_text'].strip().replace("\xa0", " ")
 
                     if output_str == "":

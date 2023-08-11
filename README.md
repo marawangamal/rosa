@@ -37,7 +37,7 @@ Then, run the following commands:
 ```commandline
 export E2E_METRICS_EXEC=/path/to/e2e-metrics/measure_scores.py
 python eval.py -r path/to/saved/runs // generate predictions 
-bash eval.sh $E2E_METRICS_EXEC -p path/to/saved/runs // evaluate predictions
+bash eval.sh $E2E_METRICS_EXEC path/to/saved/runs // evaluate predictions
 python compile.py path/to/saved/runs // compile results of all models
 ```
 
