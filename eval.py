@@ -36,7 +36,7 @@ def get_data(experiment_args):
 
 # https://stackoverflow.com/questions/76465343/huggingface-transformers-model-config-reported-this-is-a-deprecated-strategy-to
 # @hydra.main(version_base=None, config_path="./", config_name="configs")
-def evaluate_experiment(experiment_root):
+def evaluate_experiment(experiment_root, output_filename="e2e_test_predictions.txt"):
     # Convert config to dict
     experiment_args = load_object(osp.join(experiment_root, "args.pkl"))
 
@@ -53,7 +53,7 @@ def evaluate_experiment(experiment_root):
     cmodel = {
         "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
     }[experiment_args['fnmodel']['name'].lower()](model, **experiment_args['fnmodel']['params'])
-    dct_best = torch.load(osp.join(experiment_root, "model_best.pth"))
+    dct_best = torch.load(osp.join(experiment_root, "model_latest.pth"))
     cmodel.load_state_dict(dct_best['model_state_dict'])
     cmodel.to(device)
 
@@ -75,7 +75,7 @@ def evaluate_experiment(experiment_root):
     if experiment_args['dataset']['name'] == "e2e_nlg":
 
         output_path_refs = osp.join(experiment_root, "e2e_test_references.txt")
-        output_path_preds = osp.join(experiment_root, "e2e_test_predictions.txt")
+        output_path_preds = osp.join(experiment_root, output_filename)
 
         with open(output_path_refs, "w", newline="") as f:
             current_mr = ""
@@ -123,16 +123,17 @@ def main(args):
         experiments = [osp.join(args.root, d) for d in os.listdir(args.root) if osp.isdir(osp.join(args.root, d))]
         for experiment in experiments:
             print("Generating predictions for experiment {}".format(experiment))
-            evaluate_experiment(experiment)
+            evaluate_experiment(experiment, output_filename=osp.join(experiment, args.output_filename))
     else:
         print("Generating predictions for experiment {}".format(args.experiment))
-        evaluate_experiment(args.experiment)
+        evaluate_experiment(args.experiment, output_filename=osp.join(args.experiment, args.output_filename))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--experiment', type=str, default='', required=False, help='Experiment directory')
     parser.add_argument('-r', '--root', type=str, default='', help='Root directory')
+    parser.add_argument('-o', '--output_filename', type=str, default='e2e_test_predictions.txt', help='Output filename')
     args = parser.parse_args()
 
     assert args.experiment != '' or args.root != '', "Either experiment or root must be specified"
