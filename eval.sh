@@ -27,7 +27,7 @@ for folder in "$root"/*; do
     for prediction_file in "$folder"/e2e_test_predictions_epoch_*.txt; do
       # Check if both files exist before running the evaluation
       if [ -f "$reference_file" ] && [ -f "$prediction_file" ]; then
-        echo "Evaluating $folder with prediction file $prediction_file" >> $output_file
+        echo "Evaluating $prediction_file" >> $output_file
         # Run the eval.py script and append the metrics to the output file
         $executable -p "$reference_file" "$prediction_file" >> $output_file
         echo "" >> $output_file # Add an empty line to separate results
