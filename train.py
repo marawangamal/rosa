@@ -1,6 +1,7 @@
 import os
 import os.path as osp
 import math
+import subprocess
 import time
 import logging
 import torch.nn as nn
@@ -419,6 +420,9 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         logging.info("=> Best valid metrics: " + " | ".join(
             [f"{k}: {v:.2f}" for k, v in best_valid_metrics.items()]
         ))
+
+        # output eval samples after each epoch with eval.py
+        subprocess.run(["python", "eval.py", "-e", output_path, "-o", f"e2e_test_predictions_epoch_{i_epoch}.txt"])
 
         # Sample
         prompt = {
