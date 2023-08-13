@@ -93,18 +93,17 @@ def evaluate_experiment(experiment_root, output_filename="e2e_test_predictions.t
             current_mr = ""
             for datapoint in tqdm(test_dataset, total=len(test_dataset)):
                 if datapoint['meaning_representation'] != current_mr:
-                    current_mr = datapoint['meaning_representation'].replace('"', "")
+                    current_mr = datapoint['meaning_representation']
                     input_str = "Input: {} Output: ".format(current_mr)
 
                     output_str = predictor(
                         input_str,
                         return_full_text=False,
-                        length_penalty=0.8,
+                        # length_penalty=0.8,
                         no_repeat_ngram_size=4,
-                        repetition_penalty=1.0,
-                        num_beams=10,
-                        num_return_sequences=1,
+                        num_beams=5,
                         max_length=512,
+                        # early_stopping=True,
                     )[0]['generated_text'].strip().replace("\xa0", " ")
 
                     if output_str == "":
@@ -132,8 +131,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--experiment', type=str, default='', required=False, help='Experiment directory')
-    parser.add_argument('-r', '--root', type=str, default='', help='Root directory')
     parser.add_argument('-o', '--output_filename', type=str, default='e2e_test_predictions.txt', help='Output filename')
+    parser.add_argument('-r', '--root', type=str, default='', help='Root directory of many experiments')
     args = parser.parse_args()
 
     assert args.experiment != '' or args.root != '', "Either experiment or root must be specified"
