@@ -34,22 +34,22 @@ def get_data(experiment_args):
     ).flatten()
     return test_dataset
 
+
 # https://stackoverflow.com/questions/76465343/huggingface-transformers-model-config-reported-this-is-a-deprecated-strategy-to
 # @hydra.main(version_base=None, config_path="./", config_name="configs")
 def evaluate_experiment(experiment_root, output_filename="e2e_test_predictions.txt"):
     # Convert config to dict
     experiment_args = load_object(osp.join(experiment_root, "args.pkl"))
 
-    # Load model
+    # Define model
+    logging.info("=> Using {} model ...".format(experiment_args['fnmodel']['name'].lower()))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    # device = torch.device('cpu')
     model = AutoModelForCausalLM.from_pretrained(experiment_args['model']['name'])
     tokenizer = AutoTokenizer.from_pretrained(experiment_args['model']['name'])
     tokenizer.pad_token = tokenizer.eos_token
     test_dataset = get_data(experiment_args)
-    logging.info("=> Using {} model ...".format(experiment_args['fnmodel']['name'].lower()))
 
-    # Factorize model
+    # Factorize & Load pretrained model
     cmodel = {
         "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
     }[experiment_args['fnmodel']['name'].lower()](model, **experiment_args['fnmodel']['params'])
@@ -57,12 +57,21 @@ def evaluate_experiment(experiment_root, output_filename="e2e_test_predictions.t
     cmodel.load_state_dict(dct_best['model_state_dict'])
     cmodel.to(device)
 
+    if experiment_args['dataset']['name'] == "e2e_nlg":
+        output_path_refs = osp.join(experiment_root, "e2e_test_references.txt")
+        output_path_preds = osp.join(experiment_root, output_filename)
+    else:
+        raise NotImplementedError("Dataset {} not supported".format(experiment_args['dataset']['name']))
+
+    evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer)
+
+
+def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer):
     # Evaluate model
     logging.info("=> Evaluating model ...")
     model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
     model_fn = model_fn.factorized_model if (isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) \
         else model_fn
-
     predictor = pipeline(
         'text-generation',
         model=model_fn,
@@ -71,49 +80,40 @@ def evaluate_experiment(experiment_root, output_filename="e2e_test_predictions.t
         pad_token_id=tokenizer.eos_token_id,
         eos_token_id=tokenizer.eos_token_id,
     )
+    logging.info("=> Testing model bleu scores (Device={}) ...".format(predictor.device))
+    with open(output_path_refs, "w", newline="") as f:
+        current_mr = ""
+        for i, datapoint in enumerate(tqdm(test_dataset, total=len(test_dataset))):
+            if datapoint['meaning_representation'] != current_mr:
+                if i != 0:
+                    f.write("\n")
+                current_mr = datapoint['meaning_representation']
+            hr_with_spaces = datapoint['human_reference'].translate(
+                str.maketrans({key: " {0} ".format(key) for key in string.punctuation}))
+            f.write(hr_with_spaces + "\n")
+    with open(output_path_preds, "w", newline="") as f:
+        writer = csv.writer(f)
+        current_mr = ""
+        for datapoint in tqdm(test_dataset, total=len(test_dataset)):
+            if datapoint['meaning_representation'] != current_mr:
+                current_mr = datapoint['meaning_representation']
+                input_str = "Input: {} Output: ".format(current_mr)
 
-    if experiment_args['dataset']['name'] == "e2e_nlg":
+                output_str = predictor(
+                    input_str,
+                    return_full_text=False,
+                    # length_penalty=0.8,
+                    no_repeat_ngram_size=4,
+                    num_beams=5,
+                    max_length=512,
+                    # early_stopping=True,
+                )[0]['generated_text'].strip().replace("\xa0", " ")
 
-        output_path_refs = osp.join(experiment_root, "e2e_test_references.txt")
-        output_path_preds = osp.join(experiment_root, output_filename)
+                if output_str == "":
+                    output_str = "NONE"
 
-        with open(output_path_refs, "w", newline="") as f:
-            current_mr = ""
-            for i, datapoint in enumerate(tqdm(test_dataset, total=len(test_dataset))):
-                if datapoint['meaning_representation'] != current_mr:
-                    if i != 0:
-                        f.write("\n")
-                    current_mr = datapoint['meaning_representation']
-                hr_with_spaces = datapoint['human_reference'].translate(
-                    str.maketrans({key: " {0} ".format(key) for key in string.punctuation}))
-                f.write(hr_with_spaces + "\n")
-
-        with open(output_path_preds, "w", newline="") as f:
-            writer = csv.writer(f)
-            current_mr = ""
-            for datapoint in tqdm(test_dataset, total=len(test_dataset)):
-                if datapoint['meaning_representation'] != current_mr:
-                    current_mr = datapoint['meaning_representation']
-                    input_str = "Input: {} Output: ".format(current_mr)
-
-                    output_str = predictor(
-                        input_str,
-                        return_full_text=False,
-                        # length_penalty=0.8,
-                        no_repeat_ngram_size=4,
-                        num_beams=5,
-                        max_length=512,
-                        # early_stopping=True,
-                    )[0]['generated_text'].strip().replace("\xa0", " ")
-
-                    if output_str == "":
-                        output_str = "NONE"
-
-                    # Write to CSV
-                    writer.writerow([output_str])
-
-    else:
-        raise NotImplementedError("Dataset {} not supported".format(experiment_args['dataset']['name']))
+                # Write to CSV
+                writer.writerow([output_str])
 
 
 def main(args):

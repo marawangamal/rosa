@@ -20,6 +20,7 @@ from transformers import AutoModelForCausalLM
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function
+from eval import evaluate_model
 
 import factorizednet as fn
 import pandas as pd
@@ -36,15 +37,18 @@ def get_dataloaders(args, tokenizer):
 
     train_split = {"eli5": "train_asks", "e2e_nlg": "train"}[args['dataset']['name']]
     valid_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
+    test_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
 
     train_dataset = load_dataset(
         args['dataset']['name'], split=train_split, cache_dir=args['dataset']['cache']
     )
-    # train_dataset = train_dataset[:2]
+    test_dataset = load_dataset(
+        args['dataset']['name'], split=test_split, cache_dir=args['dataset']['cache']
+    )
 
     num_train_pts, _ = train_dataset.shape
     train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
-    # train_dataset = train_dataset.select(range(100))
+
     valid_dataset = load_dataset(
         args['dataset']['name'], split=valid_split, cache_dir=args['dataset']['cache']
     )
@@ -87,7 +91,7 @@ def get_dataloaders(args, tokenizer):
     valid_dataloader = DataLoader(
         valid_tokenized_reduced_grouped, batch_size=args['train']['batch_size'], collate_fn=data_collator
     )
-    return train_dataloader, valid_dataloader, valid_dataset
+    return train_dataloader, valid_dataloader, valid_dataset, test_dataset
 
 
 def group_texts(examples, block_size=128):
@@ -253,7 +257,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
         if i_step % print_freq == 0:
             logging.info(
-                "  Epoch {:4d} | step {:4d}/{:4d} | trainable: {:,} | lr: {:.6f} | loss {:5.2f} | ppl {:8.2f} | "
+                "\tEpoch {:4d} | step {:4d}/{:4d} | trainable: {:,} | lr: {:.6f} | loss {:5.2f} | ppl {:8.2f} | "
                 "bpc {:8.2f}".format(
                     epoch, i_step, len(train_dataloader), n_trainable_params, optimizer.param_groups[0]['lr'],
                     loss.item(), torch.exp(loss).item(),
@@ -286,7 +290,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
 def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device, output_path,
           tokenizer, writer, curr_epoch=1, best_valid_metrics=None, baseline_runtime_metrics=None,
-          cuda_memory_tracker=None):
+          cuda_memory_tracker=None, test_dataset=None):
 
     # Get runtime metrics
     cuda_memory_tracker = CudaMemoryTracker() if cuda_memory_tracker is None else cuda_memory_tracker
@@ -318,6 +322,11 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
             cuda_memory_tracker.track("[train] After epoch level sample trainable")
 
+        # Evaluate
+        train_end_time = time.time()
+        valid_metrics = evaluate(cmodel, device, valid_dataloader)
+        valid_end_time = time.time()
+
         # Train
         cuda_memory_tracker.track("[train] Before train epoch")
         _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
@@ -326,9 +335,6 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             args, cmodel, device, train_dataloader, optimizer, lr_scheduler, i_epoch,
             print_freq=args["logging"]["print_freq"], writer=writer
         )
-        train_end_time = time.time()
-        valid_metrics = evaluate(cmodel, device, valid_dataloader)
-        valid_end_time = time.time()
 
         cuda_memory_tracker.track("[train] After train epoch")
         _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
@@ -380,7 +386,19 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 'config': args
             }, osp.join(output_path, "model_latest.pth"))
 
-        elif i_epoch % 5 == 0 or i_epoch == args["train"]["epochs"]:
+            torch.save({
+                'epoch': i_epoch,
+                'optimizer_state_dict': optimizer.state_dict(),
+                'model_state_dict': model_state_dict,
+                'torchrandom_state': torch.get_rng_state(),
+                'train_metrics': train_metrics,
+                'valid_metrics': valid_metrics,
+                'baseline_runtime_metrics': baseline_runtime_metrics,
+                'factorized_runtime_metrics': factorized_runtime_metrics,
+                'config': args
+            }, osp.join(output_path, "model_{}.pth".format(i_epoch)))
+
+        elif i_epoch % 1 == 0 or i_epoch == args["train"]["epochs"]:
 
             try:
                 model_state_dict = cmodel.module.state_dict()
@@ -398,6 +416,18 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 'factorized_runtime_metrics': factorized_runtime_metrics,
                 'config': args
             }, osp.join(output_path, "model_latest.pth"))
+
+            torch.save({
+                'epoch': i_epoch,
+                'optimizer_state_dict': optimizer.state_dict(),
+                'model_state_dict': model_state_dict,
+                'torchrandom_state': torch.get_rng_state(),
+                'train_metrics': train_metrics,
+                'valid_metrics': valid_metrics,
+                'baseline_runtime_metrics': baseline_runtime_metrics,
+                'factorized_runtime_metrics': factorized_runtime_metrics,
+                'config': args
+            }, osp.join(output_path, "model_{}.pth".format(i_epoch)))
 
         # Log to tensorboard
         for m in valid_metrics.keys():
@@ -422,7 +452,11 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         ))
 
         # output eval samples after each epoch with eval.py
-        subprocess.run(["python", "eval.py", "-e", output_path, "-o", f"e2e_test_predictions_epoch_{i_epoch}.txt"])
+        # subprocess.run(["python", "eval.py", "-e", output_path, "-o", f"e2e_test_predictions_epoch_{i_epoch}.txt"])
+        # if test_dataset is not None:
+        #     output_path_preds = osp.join(output_path, f"e2e_test_predictions_epoch_{i_epoch}.txt")
+        #     output_path_refs = osp.join(output_path, f"e2e_test_references.txt")
+        #     evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer)
 
         # Sample
         prompt = {
@@ -500,7 +534,7 @@ def main(cfg: DictConfig):
     model = AutoModelForCausalLM.from_pretrained(args['model']['name'])
     tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
     tokenizer.pad_token = tokenizer.eos_token
-    train_dataloader, valid_dataloader, valid_dataset = get_dataloaders(args, tokenizer)
+    train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
     logging.info("Model:\n{}".format(model))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     cuda_memory_tracker.track('[main] Created base model loaded to cpu')
@@ -599,7 +633,8 @@ def main(cfg: DictConfig):
     train(
         args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device,
         output_path, tokenizer, writer, curr_epoch=curr_epoch + 1, best_valid_metrics=curr_best_valid_metrics,
-        baseline_runtime_metrics=baseline_runtime_metrics, cuda_memory_tracker=cuda_memory_tracker
+        baseline_runtime_metrics=baseline_runtime_metrics, cuda_memory_tracker=cuda_memory_tracker,
+        test_dataset=test_dataset
     )
 
     print("=> Experiment: `{}` Succeeded".format(folder_name))

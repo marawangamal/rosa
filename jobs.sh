@@ -14,6 +14,7 @@ source /home/mila/m/marawan.gamal/.venv/tn/bin/activate
 # 3. Copy your dataset on the compute node
 cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
 
+
 # 4. Run your code
 python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 train.lr=5e-5 train.scheduler.name=linear train.batch_size=10 train.optimizer.name=adamw model.name=gpt2-medium fnmodel.name=none
 
