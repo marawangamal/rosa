@@ -36,7 +36,39 @@ for subdir, _, _ in os.walk(root):
         # Read the metrics from the file
         with open(metrics_file_path, 'r') as metrics_file:
             lines = metrics_file.readlines()
-            scores = {line.split(":")[0].strip(): line.split(":")[1].strip() for line in lines if ':' in line}
+            scores_dict = {}
+            current_evaluation_file = None
+            max_bleu = -1  # Initialize with a value lower than any possible BLEU score
+            max_bleu_file = None
+
+            for index, line in enumerate(lines):
+                if line.startswith("Evaluating"):
+                    current_evaluation_file = line.split(" ")[1]
+                elif line.startswith("SCORES:"):
+                    # import pdb; pdb.set_trace()
+                    metrics = {}
+                    # Read scores till we hit a blank line
+                    for offset, score_line in enumerate(lines[index + 1:], 1):
+                        if score_line == "":
+                            break
+                        if ":" not in score_line:  # Skip lines without colon (like "========")
+                            continue
+
+                        metric_name, score = score_line.split(":")
+                        # Skip empty scores
+                        if not score.strip():
+                            continue
+                        metrics[metric_name.strip()] = float(score.strip())
+
+                    scores_dict[current_evaluation_file] = metrics
+
+                    if metrics['BLEU'] > max_bleu:
+                        max_bleu = metrics['BLEU']
+                        max_bleu_file = current_evaluation_file
+                    current_evaluation_file = None
+
+            # scores = {line.split(":")[0].strip(): line.split(":")[1].strip() for line in lines if ':' in line}
+            scores = scores_dict[max_bleu_file]
 
         # Append the metrics to the results list
         results.append([

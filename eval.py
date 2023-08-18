@@ -19,6 +19,7 @@ import torch
 
 import factorizednet as fn
 from datasets import load_dataset
+from transformers.pipelines.pt_utils import KeyDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from utils import load_object
 
@@ -37,12 +38,12 @@ def get_data(experiment_args):
 
 # https://stackoverflow.com/questions/76465343/huggingface-transformers-model-config-reported-this-is-a-deprecated-strategy-to
 # @hydra.main(version_base=None, config_path="./", config_name="configs")
-def evaluate_experiment(experiment_root, output_filename="e2e_test_predictions.txt"):
+def evaluate_experiment(experiment_root):
     # Convert config to dict
     experiment_args = load_object(osp.join(experiment_root, "args.pkl"))
 
     # Define model
-    logging.info("=> Using {} model ...".format(experiment_args['fnmodel']['name'].lower()))
+    print("=> Using {} model ...".format(experiment_args['fnmodel']['name'].lower()))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = AutoModelForCausalLM.from_pretrained(experiment_args['model']['name'])
     tokenizer = AutoTokenizer.from_pretrained(experiment_args['model']['name'])
@@ -53,22 +54,27 @@ def evaluate_experiment(experiment_root, output_filename="e2e_test_predictions.t
     cmodel = {
         "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
     }[experiment_args['fnmodel']['name'].lower()](model, **experiment_args['fnmodel']['params'])
-    dct_best = torch.load(osp.join(experiment_root, "model_latest.pth"))
-    cmodel.load_state_dict(dct_best['model_state_dict'])
-    cmodel.to(device)
 
-    if experiment_args['dataset']['name'] == "e2e_nlg":
-        output_path_refs = osp.join(experiment_root, "e2e_test_references.txt")
-        output_path_preds = osp.join(experiment_root, output_filename)
-    else:
-        raise NotImplementedError("Dataset {} not supported".format(experiment_args['dataset']['name']))
+    model_names = [name for name in os.listdir(experiment_root) if name.startswith("model_") and name.endswith(".pth")]
 
-    evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer)
+    for model_name in model_names:
+        print("\t=> Loading model {} ...".format(model_name))
+        dct_best = torch.load(osp.join(experiment_root, model_name))
+        cmodel.load_state_dict(dct_best['model_state_dict'])
+        cmodel.to(device)
+
+        if experiment_args['dataset']['name'] == "e2e_nlg":
+            output_path_refs = osp.join(experiment_root, "test_references.txt")
+            output_filename = model_name.replace("model_", "test_predictions_").replace(".pth", ".csv")
+            output_path_preds = osp.join(experiment_root, output_filename)
+        else:
+            raise NotImplementedError("Dataset {} not supported".format(experiment_args['dataset']['name']))
+
+        evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer)
 
 
 def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer):
     # Evaluate model
-    logging.info("=> Evaluating model ...")
     model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
     model_fn = model_fn.factorized_model if (isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) \
         else model_fn
@@ -91,9 +97,35 @@ def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, to
             hr_with_spaces = datapoint['human_reference'].translate(
                 str.maketrans({key: " {0} ".format(key) for key in string.punctuation}))
             f.write(hr_with_spaces + "\n")
+
     with open(output_path_preds, "w", newline="") as f:
         writer = csv.writer(f)
         current_mr = ""
+
+        # # map to the correct format for MR
+        # test_dataset = test_dataset.map(
+        #     lambda x: {
+        #         "input_text": "Input: {} Output: ".format(x['meaning_representation']),
+        #         "human_reference": x['human_reference'],
+        #     }
+        # )
+        #
+        # iter_obj = predictor(
+        #     KeyDataset(test_dataset, "input_text"),
+        #     return_full_text=False,
+        #     # length_penalty=0.8,
+        #     no_repeat_ngram_size=4,
+        #     num_beams=5,
+        #     max_length=512,
+        #     # early_stopping=True,
+        # )
+        #
+        # for out in tqdm(iter_obj, total=len(test_dataset)):
+        #     output_str = out[0]['generated_text'].strip().replace("\xa0", " ")
+        #     if output_str == "":
+        #         output_str = "NONE"
+        #     writer.writerow([output_str])
+
         for datapoint in tqdm(test_dataset, total=len(test_dataset)):
             if datapoint['meaning_representation'] != current_mr:
                 current_mr = datapoint['meaning_representation']
@@ -121,17 +153,16 @@ def main(args):
     if args.experiment == '':
         experiments = [osp.join(args.root, d) for d in os.listdir(args.root) if osp.isdir(osp.join(args.root, d))]
         for experiment in experiments:
-            print("Generating predictions for experiment {}".format(experiment))
-            evaluate_experiment(experiment, output_filename=osp.join(experiment, args.output_filename))
+            print("=> Generating predictions for experiment {}".format(experiment))
+            evaluate_experiment(experiment)
     else:
-        print("Generating predictions for experiment {}".format(args.experiment))
-        evaluate_experiment(args.experiment, output_filename=osp.join(args.experiment, args.output_filename))
+        print("=> Generating predictions for experiment {}".format(args.experiment))
+        evaluate_experiment(args.experiment)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--experiment', type=str, default='', required=False, help='Experiment directory')
-    parser.add_argument('-o', '--output_filename', type=str, default='e2e_test_predictions.txt', help='Output filename')
     parser.add_argument('-r', '--root', type=str, default='', help='Root directory of many experiments')
     args = parser.parse_args()
 

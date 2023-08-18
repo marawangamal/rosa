@@ -38,10 +38,14 @@ for folder in "$root"/*; do
     output_file="$folder/$output_file_name"
 
     # Define the paths for the reference and prediction txt files
-    reference_file="$folder/e2e_test_references.txt"
+    reference_file="$folder/test_references.txt"
+
+    for file in "$folder"/*.csv; do
+        mv "$file" "${file%.csv}.txt"
+    done
 
     # iterate over prediction_files suffixed with _epoch_0, _epoch_1, etc.
-    for prediction_file in "$folder"/e2e_test_predictions_epoch_*.txt; do
+    for prediction_file in "$folder"/test_predictions*.txt; do
       # Check if both files exist before running the evaluation
       if [ -f "$reference_file" ] && [ -f "$prediction_file" ]; then
         echo "Evaluating $prediction_file" >> $output_file
