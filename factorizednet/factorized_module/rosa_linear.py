@@ -136,7 +136,7 @@ class RosaLinear(FactorizedLayer):
 
         Args:
             rank: Ratio of gradients to be masked
-            method: Method to mask gradients. 'random' or 'top'
+            method: Method to mask gradients (one of ['random', 'top', 'bottom'])
             collapse_fixed: Whether to collapse the fixed parameters into single matrix
 
         Returns:
@@ -152,8 +152,10 @@ class RosaLinear(FactorizedLayer):
                     w_tot = self.rosa_a_trainable @ self.rosa_b_trainable
                     w_tot = w_tot + self.rosa_w_fixed if self.rosa_w_fixed is not None else w_tot
                     u, s, vt = torch.linalg.svd(w_tot, full_matrices=False)
-                    a = torch.sqrt(s).reshape(1, -1) * u  # [in_f, full_rank]
-                    b = torch.sqrt(s).reshape(-1, 1) * vt  # [full_rank, out_f]
+                    # a = torch.sqrt(s).reshape(1, -1) * u  # [in_f, full_rank]
+                    # b = torch.sqrt(s).reshape(-1, 1) * vt  # [full_rank, out_f]
+                    a = s.reshape(1, -1) * u  # [in_f, full_rank]
+                    b = vt  # [full_rank, out_f]
 
                 else:
                     a = self.a_weight.data  # [in_f, full_rank]
@@ -173,14 +175,14 @@ class RosaLinear(FactorizedLayer):
                 grad_indices = torch.arange(start_idx, max(end_idx, start_idx + 1))
                 non_grad_indices = [i for i in range(full_rank) if i not in grad_indices]
 
-            elif method == 'bottom':
+            elif method in ['top', 'bottom']:
 
                 if collapse_fixed:
                     w_tot = self.rosa_a_trainable @ self.rosa_b_trainable
                     w_tot = w_tot + self.rosa_w_fixed if self.rosa_w_fixed is not None else w_tot
                     u, s, vt = torch.linalg.svd(w_tot, full_matrices=False)
-                    a = torch.sqrt(s).reshape(1, -1) * u  # [in_f, r]
-                    b = torch.sqrt(s).reshape(-1, 1) * vt  # [r, out_f]
+                    a = s.reshape(1, -1) * u  # [in_f, full_rank]
+                    b = vt  # [full_rank, out_f]
 
                 else:
                     a = self.a_weight.data  # [in_f, r_full]
@@ -193,9 +195,15 @@ class RosaLinear(FactorizedLayer):
                 full_rank = a.size(1)
                 bias = self.rosa_bias.data if self.rosa_bias is not None else None
 
-                start_idx = max(len(s) - self.ratio2int(rank, full_rank) - 1, 0) if rank < 1 else max(len(s) - rank, 0)
-                grad_indices = torch.arange(start_idx, len(s))
-                non_grad_indices = [i for i in range(full_rank) if i not in grad_indices]
+                if method == 'bottom':
+                    start_idx = max(len(s) - self.ratio2int(rank, full_rank) - 1, 0) if rank < 1 else max(len(s) - rank, 0)
+                    grad_indices = torch.arange(start_idx, len(s))
+                    non_grad_indices = [i for i in range(full_rank) if i not in grad_indices]
+                else:
+                    start_idx = 0
+                    end_idx = self.ratio2int(rank, full_rank) if rank < 1 else rank
+                    grad_indices = torch.arange(start_idx, end_idx)
+                    non_grad_indices = [i for i in range(full_rank) if i not in grad_indices]
 
             else:
                 raise NotImplementedError(f"Unknown grad_sample_method: {method}")
