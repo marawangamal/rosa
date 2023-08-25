@@ -65,9 +65,9 @@ class RosaNet(nn.Module):
             RosaNet object with low rank trainable matrices
         """
 
-        assert sample_method != None or self.sample_method != None, "sample_method must be specified"
-        assert rank != None or self.rank != None, "rank must be specified"
-        assert collapse_fixed != None or self.collapse_fixed != None, "collapse_fixed must be specified"
+        assert sample_method is not None or self.sample_method is not None, "sample_method must be specified"
+        assert rank is not None or self.rank is not None, "rank must be specified"
+        assert collapse_fixed is not None or self.collapse_fixed is not None, "collapse_fixed must be specified"
 
         rank = rank if rank is not None else self.rank
         sample_method = sample_method if sample_method is not None else self.sample_method
