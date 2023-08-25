@@ -1,4 +1,5 @@
 runs: 1
+debug: True
 train:
   epochs: 5
   lr: 5e-5  # 0.0002 for paper
@@ -20,7 +21,7 @@ model:
 fnmodel:
   name: factorized # factorized, lora, none
   params:
-    rank: 0.5  # rank of trainable parameters float in (0,1) or int
+    rank: 0.01  # rank of trainable parameters float in (0,1) or int
     level: epoch  # for factorized only. "epoch", "batch"
     sample_method: random  # for factorized only. "random", "bottom"
     collapse_fixed: True # for factorized only. collapse fixed parameters
@@ -36,5 +37,4 @@ dataset:
 eval:
   batch_size: 8
   experiment: runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9_w0.01_nanone_nu100_namdistillgpt2_namelora_r0.1_leepoch_srandom_t0 # experiment name
-debug: False
 

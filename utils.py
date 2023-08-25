@@ -185,9 +185,9 @@ class AverageMeter:
         self.sum = 0
         self.pts = 0
 
-    def add(self, val):
+    def add(self, val, n=1):
         self.sum += val
-        self.pts += 1
+        self.pts += n
 
     @property
     def value(self):

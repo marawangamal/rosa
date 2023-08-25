@@ -20,7 +20,7 @@ from transformers import AutoModelForCausalLM
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function
-from eval import evaluate_model
+from eval import evaluate_model_bleu
 
 import factorizednet as fn
 import pandas as pd
@@ -36,7 +36,7 @@ def get_dataloaders(args, tokenizer):
     assert args['dataset']['name'] in ["eli5", "e2e_nlg"], "Dataset not supported"
 
     train_split = {"eli5": "train_asks", "e2e_nlg": "train"}[args['dataset']['name']]
-    valid_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
+    valid_split = {"eli5": "validation_asks", "e2e_nlg": "validation"}[args['dataset']['name']]
     test_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
 
     train_dataset = load_dataset(
@@ -45,13 +45,13 @@ def get_dataloaders(args, tokenizer):
     test_dataset = load_dataset(
         args['dataset']['name'], split=test_split, cache_dir=args['dataset']['cache']
     )
-
-    num_train_pts, _ = train_dataset.shape
-    train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
-
     valid_dataset = load_dataset(
         args['dataset']['name'], split=valid_split, cache_dir=args['dataset']['cache']
     )
+
+    # Filter for faster training (debug)
+    num_train_pts, _ = train_dataset.shape
+    train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
 
     # Apply tokenizer to dataset
     train_tokenized = train_dataset.map(
@@ -65,20 +65,29 @@ def get_dataloaders(args, tokenizer):
     valid_tokenized = valid_dataset.map(
         lambda examples: preprocess_function(
             examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']),
-        batched=True,
-        # num_proc=4,
+        batched=True
+    )
+
+    test_tokenized = test_dataset.map(
+        lambda examples: preprocess_function(
+            examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']),
+        batched=True
     )
 
     # Only include tokenized ids
     train_tokenized_reduced = train_tokenized.remove_columns(train_dataset.column_names)
     valid_tokenized_reduced = valid_tokenized.remove_columns(valid_dataset.column_names)
+    test_tokenized_reduced = test_tokenized.remove_columns(test_dataset.column_names)
 
     if args['dataset']['name'] == "eli5":
         train_tokenized_reduced_grouped = train_tokenized_reduced.map(group_texts, batched=True)
         valid_tokenized_reduced_grouped = valid_tokenized_reduced.map(group_texts, batched=True)
-    else:
+    elif args['dataset']['name'] == "e2e_nlg":
         train_tokenized_reduced_grouped = train_tokenized_reduced
         valid_tokenized_reduced_grouped = valid_tokenized_reduced
+        test_tokenized_reduced_grouped = test_tokenized_reduced
+    else:
+        raise NotImplementedError
 
     # data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, return_tensors="pt", padding=True)
@@ -86,12 +95,14 @@ def get_dataloaders(args, tokenizer):
         train_tokenized_reduced_grouped, shuffle=True, batch_size=args['train']['batch_size'], collate_fn=data_collator,
         pin_memory=True, num_workers=2
     )
-    # import pdb; pdb.set_trace()
-    # out = next(iter(train_dataloader))
     valid_dataloader = DataLoader(
         valid_tokenized_reduced_grouped, batch_size=args['train']['batch_size'], collate_fn=data_collator
     )
-    return train_dataloader, valid_dataloader, valid_dataset, test_dataset
+    test_dataloader = DataLoader(
+        test_tokenized_reduced_grouped, batch_size=args['train']['batch_size'], collate_fn=data_collator
+    )
+
+    return train_dataloader, valid_dataloader, test_dataloader, test_dataset
 
 
 def group_texts(examples, block_size=128):
@@ -290,7 +301,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
 def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device, output_path,
           tokenizer, writer, curr_epoch=1, best_valid_metrics=None, baseline_runtime_metrics=None,
-          cuda_memory_tracker=None, test_dataset=None):
+          cuda_memory_tracker=None, test_dataloader=None, test_dataset=None):
 
     # Get runtime metrics
     cuda_memory_tracker = CudaMemoryTracker() if cuda_memory_tracker is None else cuda_memory_tracker
@@ -322,11 +333,6 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
             cuda_memory_tracker.track("[train] After epoch level sample trainable")
 
-        # Evaluate
-        train_end_time = time.time()
-        valid_metrics = evaluate(cmodel, device, valid_dataloader)
-        valid_end_time = time.time()
-
         # Train
         cuda_memory_tracker.track("[train] Before train epoch")
         _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
@@ -335,9 +341,20 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             args, cmodel, device, train_dataloader, optimizer, lr_scheduler, i_epoch,
             print_freq=args["logging"]["print_freq"], writer=writer
         )
+        train_end_time = time.time()
 
         cuda_memory_tracker.track("[train] After train epoch")
         _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
+
+        # Evaluate
+        valid_metrics = evaluate(cmodel, device, valid_dataloader)
+        valid_end_time = time.time()
+
+        # Test
+        logging.info("=> Computing test metrics...")
+        test_metrics_advanced = evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=device) \
+            if test_dataset is not None else None
+        test_metrics = evaluate(cmodel, device, test_dataloader) if test_dataloader is not None else None
 
         # Log metrics
         logging.info(
@@ -345,89 +362,41 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 i_epoch, args["train"]["epochs"], (train_end_time - epoch_start_time),
                 (valid_end_time - epoch_start_time)
             )
-            + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()])
-            + " | ".join([f"Valid {k}: {v:.2f}" for k, v in valid_metrics.items()])
+            + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | "
+            + " | ".join([f"Valid {k}: {v:.2f}" for k, v in valid_metrics.items()]) + " | "
+            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics.items()]) + " | "
+            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics_advanced.items()])
         )
         logging.info(cuda_memory_tracker.report())
 
+        # Ckpt object
+        try:
+            model_state_dict = cmodel.module.state_dict()
+        except AttributeError:
+            model_state_dict = cmodel.state_dict()
+        ckpt = {
+            'epoch': i_epoch,
+            'optimizer_state_dict': optimizer.state_dict(),
+            'model_state_dict': model_state_dict,
+            'torchrandom_state': torch.get_rng_state(),
+            'train_metrics': train_metrics,
+            'valid_metrics': valid_metrics,
+            'test_metrics': test_metrics,
+            'baseline_runtime_metrics': baseline_runtime_metrics,
+            'factorized_runtime_metrics': factorized_runtime_metrics,
+            'config': args
+        }
+
         # Save model checkpoint
         if best_valid_metrics is None or valid_metrics['loss'] < best_valid_metrics['loss']:
-            # Compute here for convenience
-
-            try:
-                model_state_dict = cmodel.module.state_dict()
-            except AttributeError:
-                model_state_dict = cmodel.state_dict()
-
-            torch.save({
-                'epoch': i_epoch,
-                'optimizer_state_dict': optimizer.state_dict(),
-                'model_state_dict': model_state_dict,
-                'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': train_metrics,
-                'valid_metrics': valid_metrics,
-                'baseline_runtime_metrics': baseline_runtime_metrics,
-                'factorized_runtime_metrics': factorized_runtime_metrics,
-                'config': args
-            }, osp.join(output_path, "model_best.pth"))
-
             best_valid_metrics = valid_metrics
-
-            # Save the latest model
-            torch.save({
-                'epoch': i_epoch,
-                'optimizer_state_dict': optimizer.state_dict(),
-                'model_state_dict': model_state_dict,
-                'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': train_metrics,
-                'valid_metrics': valid_metrics,
-                'baseline_runtime_metrics': baseline_runtime_metrics,
-                'factorized_runtime_metrics': factorized_runtime_metrics,
-                'config': args
-            }, osp.join(output_path, "model_latest.pth"))
-
-            torch.save({
-                'epoch': i_epoch,
-                'optimizer_state_dict': optimizer.state_dict(),
-                'model_state_dict': model_state_dict,
-                'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': train_metrics,
-                'valid_metrics': valid_metrics,
-                'baseline_runtime_metrics': baseline_runtime_metrics,
-                'factorized_runtime_metrics': factorized_runtime_metrics,
-                'config': args
-            }, osp.join(output_path, "model_{}.pth".format(i_epoch)))
+            torch.save(ckpt, osp.join(output_path, "model_best.pth"))
+            torch.save(ckpt, osp.join(output_path, "model_latest.pth"))
+            torch.save(ckpt, osp.join(output_path, "model_{}.pth".format(i_epoch)))
 
         elif i_epoch % 1 == 0 or i_epoch == args["train"]["epochs"]:
-
-            try:
-                model_state_dict = cmodel.module.state_dict()
-            except AttributeError:
-                model_state_dict = cmodel.state_dict()
-
-            torch.save({
-                'epoch': i_epoch,
-                'optimizer_state_dict': optimizer.state_dict(),
-                'model_state_dict': model_state_dict,
-                'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': train_metrics,
-                'valid_metrics': valid_metrics,
-                'baseline_runtime_metrics': baseline_runtime_metrics,
-                'factorized_runtime_metrics': factorized_runtime_metrics,
-                'config': args
-            }, osp.join(output_path, "model_latest.pth"))
-
-            torch.save({
-                'epoch': i_epoch,
-                'optimizer_state_dict': optimizer.state_dict(),
-                'model_state_dict': model_state_dict,
-                'torchrandom_state': torch.get_rng_state(),
-                'train_metrics': train_metrics,
-                'valid_metrics': valid_metrics,
-                'baseline_runtime_metrics': baseline_runtime_metrics,
-                'factorized_runtime_metrics': factorized_runtime_metrics,
-                'config': args
-            }, osp.join(output_path, "model_{}.pth".format(i_epoch)))
+            torch.save(ckpt, osp.join(output_path, "model_latest.pth"))
+            torch.save(ckpt, osp.join(output_path, "model_{}.pth".format(i_epoch)))
 
         # Log to tensorboard
         for m in valid_metrics.keys():
@@ -437,6 +406,16 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         for m in train_metrics.keys():
             if m is not None:
                 writer.add_scalar("train/{}".format(m), train_metrics[m], i_epoch)
+
+        if test_metrics is not None:
+            for m in test_metrics.keys():
+                if m is not None:
+                    writer.add_scalar("test/{}".format(m), test_metrics[m], i_epoch)
+
+        if test_metrics_advanced is not None:
+            for m in test_metrics_advanced.keys():
+                if m is not None:
+                    writer.add_scalar("test/{}".format(m), test_metrics_advanced[m], i_epoch)
 
         writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], i_epoch)
 
@@ -450,13 +429,6 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         logging.info("=> Best valid metrics: " + " | ".join(
             [f"{k}: {v:.2f}" for k, v in best_valid_metrics.items()]
         ))
-
-        # output eval samples after each epoch with eval.py
-        # subprocess.run(["python", "eval.py", "-e", output_path, "-o", f"e2e_test_predictions_epoch_{i_epoch}.txt"])
-        # if test_dataset is not None:
-        #     output_path_preds = osp.join(output_path, f"e2e_test_predictions_epoch_{i_epoch}.txt")
-        #     output_path_refs = osp.join(output_path, f"e2e_test_references.txt")
-        #     evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer)
 
         # Sample
         prompt = {
@@ -479,7 +451,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         )
         sample_str = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0].strip()
         writer.add_text('Sample', sample_str, i_epoch)
-        logging.info("Sample: \n{}".format(sample_str))
+        logging.info("Sample: \n{}\nEND of Epoch\n=========\n".format(sample_str))
 
 
 @hydra.main(version_base=None, config_path="./", config_name="configs")
@@ -534,7 +506,8 @@ def main(cfg: DictConfig):
     model = AutoModelForCausalLM.from_pretrained(args['model']['name'])
     tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
     tokenizer.pad_token = tokenizer.eos_token
-    train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
+    # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
+    train_dataloader, valid_dataloader, test_dataloader, test_dataset = get_dataloaders(args, tokenizer)
     logging.info("Model:\n{}".format(model))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     cuda_memory_tracker.track('[main] Created base model loaded to cpu')
@@ -546,7 +519,7 @@ def main(cfg: DictConfig):
 
     baseline_mean, baseline_std = get_latency(
         model, device=device, inp=torch.ones(args['logging']['input_size'], dtype=torch.long)
-    )
+    ) if not args['debug'] else (1, 1)
     baseline_params = get_num_params(model)
 
     baseline_runtime_metrics = {
@@ -576,11 +549,18 @@ def main(cfg: DictConfig):
         torch.cuda.empty_cache()
         cuda_memory_tracker.track('[main] Moved factorized model loaded to gpu')
 
-        optimizer = opt(
-            cmodel.parameters(),
-            lr=args["train"]["lr"],
-            **args['train']['optimizer']['params']
-        )
+        if args['train']['optimizer']['name'] == "sgd":
+            optimizer = opt(
+                cmodel.parameters(),
+                lr=args["train"]["lr"],
+                **args['train']['optimizer']['params']
+            )
+        # Catch all exceptions
+        else:
+            optimizer = opt(
+                cmodel.parameters(),
+                lr=args["train"]["lr"]
+            )
 
         cuda_memory_tracker.track('[main] Optimizer passed network parameters')
 
@@ -616,7 +596,7 @@ def main(cfg: DictConfig):
     logging.info("=> Computing factorized latency...")
     factorized_mean, factorized_std = get_latency(
         cmodel, device=device, inp=torch.ones(args['logging']['input_size'], dtype=torch.long)
-    )
+    ) if not args['debug'] else (1, 1)
     factorized_params = get_num_params(cmodel)
 
     logging.info("=> Baseline {:.4f} ms| Factorized {:.4f} ms | Speedup {:.4f} | Compression {:.4f}".format(
@@ -634,7 +614,7 @@ def main(cfg: DictConfig):
         args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device,
         output_path, tokenizer, writer, curr_epoch=curr_epoch + 1, best_valid_metrics=curr_best_valid_metrics,
         baseline_runtime_metrics=baseline_runtime_metrics, cuda_memory_tracker=cuda_memory_tracker,
-        test_dataset=test_dataset
+        test_dataloader=test_dataloader, test_dataset=test_dataset
     )
 
     print("=> Experiment: `{}` Succeeded".format(folder_name))
