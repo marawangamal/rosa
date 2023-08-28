@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from datasets import load_dataset
-from transformers import DataCollatorForSeq2Seq
+from transformers import DataCollatorWithPadding
 from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
 
@@ -30,23 +30,30 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 2000)
 pd.set_option('display.float_format', '{:.3f}'.format)
 
+task_to_keys = {
+    "cola": ("sentence", None),
+    "mnli": ("premise", "hypothesis"),
+    "mrpc": ("sentence1", "sentence2"),
+    "qnli": ("question", "sentence"),
+    "qqp": ("question1", "question2"),
+    "rte": ("sentence1", "sentence2"),
+    "sst2": ("sentence", None),
+    "stsb": ("sentence1", "sentence2"),
+    "wnli": ("sentence1", "sentence2"),
+}
 
 def get_dataloaders(args, tokenizer):
     # Load dataset
-    assert args['dataset']['name'] in ["eli5", "e2e_nlg"], "Dataset not supported"
-
-    train_split = {"eli5": "train_asks", "e2e_nlg": "train"}[args['dataset']['name']]
-    valid_split = {"eli5": "validation_asks", "e2e_nlg": "validation"}[args['dataset']['name']]
-    test_split = {"eli5": "validation_asks", "e2e_nlg": "test"}[args['dataset']['name']]
+    assert args['dataset']['name'] in task_to_keys.keys(), "Dataset not supported"
 
     train_dataset = load_dataset(
-        args['dataset']['name'], split=train_split, cache_dir=args['dataset']['cache']
+        args['dataset']['name'], split="train", cache_dir=args['dataset']['cache']
     )
     test_dataset = load_dataset(
-        args['dataset']['name'], split=test_split, cache_dir=args['dataset']['cache']
+        args['dataset']['name'], split="test", cache_dir=args['dataset']['cache']
     )
     valid_dataset = load_dataset(
-        args['dataset']['name'], split=valid_split, cache_dir=args['dataset']['cache']
+        args['dataset']['name'], split="validation", cache_dir=args['dataset']['cache']
     )
 
     # Filter for faster training (debug)
@@ -79,27 +86,18 @@ def get_dataloaders(args, tokenizer):
     valid_tokenized_reduced = valid_tokenized.remove_columns(valid_dataset.column_names)
     test_tokenized_reduced = test_tokenized.remove_columns(test_dataset.column_names)
 
-    if args['dataset']['name'] == "eli5":
-        train_tokenized_reduced_grouped = train_tokenized_reduced.map(group_texts, batched=True)
-        valid_tokenized_reduced_grouped = valid_tokenized_reduced.map(group_texts, batched=True)
-    elif args['dataset']['name'] == "e2e_nlg":
-        train_tokenized_reduced_grouped = train_tokenized_reduced
-        valid_tokenized_reduced_grouped = valid_tokenized_reduced
-        test_tokenized_reduced_grouped = test_tokenized_reduced
-    else:
-        raise NotImplementedError
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer, 
+                                            return_tensors="pt", padding=True, pad_to_multiple_of=8)
 
-    # data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, return_tensors="pt", padding=True)
     train_dataloader = DataLoader(
-        train_tokenized_reduced_grouped, shuffle=True, batch_size=args['train']['batch_size'], collate_fn=data_collator,
+        train_tokenized_reduced, shuffle=True, batch_size=args['train']['batch_size'], collate_fn=data_collator,
         pin_memory=True, num_workers=2
     )
     valid_dataloader = DataLoader(
-        valid_tokenized_reduced_grouped, batch_size=args['train']['batch_size'], collate_fn=data_collator
+        valid_tokenized_reduced, batch_size=args['train']['batch_size'], collate_fn=data_collator
     )
     test_dataloader = DataLoader(
-        test_tokenized_reduced_grouped, batch_size=args['train']['batch_size'], collate_fn=data_collator
+        test_tokenized_reduced, batch_size=args['train']['batch_size'], collate_fn=data_collator
     )
 
     return train_dataloader, valid_dataloader, test_dataloader, test_dataset
