@@ -67,7 +67,7 @@ def get_dataloaders(args, tokenizer):
     # Apply tokenizer to dataset
     train_tokenized = train_dataset.map(
         lambda examples: preprocess_function_mlm(
-            examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']
+            examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']
         ),
         batched=True,
         # num_proc=4,
@@ -75,13 +75,13 @@ def get_dataloaders(args, tokenizer):
 
     valid_tokenized = valid_dataset.map(
         lambda examples: preprocess_function_mlm(
-            examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']),
+            examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']),
         batched=True
     )
 
     test_tokenized = test_dataset.map(
         lambda examples: preprocess_function_mlm(
-            examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']),
+            examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']),
         batched=True
     )
 
@@ -486,6 +486,7 @@ def main(cfg: DictConfig):
     tokenizer.pad_token = tokenizer.eos_token
     # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
     train_dataloader, valid_dataloader, test_dataloader, test_dataset = get_dataloaders(args, tokenizer)
+    # import pdb; pdb.set_trace()
     logging.info("Model:\n{}".format(model))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     cuda_memory_tracker.track('[main] Created base model loaded to cpu')

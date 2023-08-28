@@ -273,9 +273,9 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
 }
 
-def preprocess_function_mlm(examples, tokenizer, dataset_name="cola", max_length=512):
+def preprocess_function_mlm(examples, tokenizer, task_name="cola", max_length=512):
     # tokenize the texts according to the keys for each glue task
-    text_keys = task_to_keys[dataset_name]
+    text_keys = task_to_keys[task_name]
 
     # tokenize the texts, passing two arguments to the tokenizer
     # if the task has two inputs. otherwise just one

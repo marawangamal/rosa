@@ -33,7 +33,7 @@ output:
   path: /home/mila/a/aristides.milios/scratch/rosa/runs
 dataset:
   name: glue
-  task: cola
+  task_name: stsb
   cache: /home/mila/a/aristides.milios/scratch/hf_cache
 eval:
   batch_size: 8
