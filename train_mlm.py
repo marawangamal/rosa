@@ -44,16 +44,20 @@ task_to_keys = {
 
 def get_dataloaders(args, tokenizer):
     # Load dataset
-    assert args['dataset']['name'] in task_to_keys.keys(), "Dataset not supported"
+    assert args['dataset']['name'] == 'glue', "Dataset not supported"
+    assert args['dataset']['task_name'] in task_to_keys.keys(), "Task not supported"
 
     train_dataset = load_dataset(
-        args['dataset']['name'], split="train", cache_dir=args['dataset']['cache']
+        args['dataset']['name'], args['dataset']['task_name'], split="train",
+        cache_dir=args['dataset']['cache']
     )
     test_dataset = load_dataset(
-        args['dataset']['name'], split="test", cache_dir=args['dataset']['cache']
+        args['dataset']['name'], args['dataset']['task_name'], split="test",
+        cache_dir=args['dataset']['cache']
     )
     valid_dataset = load_dataset(
-        args['dataset']['name'], split="validation", cache_dir=args['dataset']['cache']
+        args['dataset']['name'], args['dataset']['task_name'],
+        split="validation", cache_dir=args['dataset']['cache']
     )
 
     # Filter for faster training (debug)
@@ -103,7 +107,7 @@ def get_dataloaders(args, tokenizer):
     return train_dataloader, valid_dataloader, test_dataloader, test_dataset
 
 
-def evaluate(model, device, eval_dataloader):
+def evaluate(model, device, eval_dataloader, task="cola"):
 
     with torch.no_grad():
         loss_average_meter = AverageMeter()
@@ -325,14 +329,16 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
 
         # Evaluate
-        valid_metrics = evaluate(cmodel, device, valid_dataloader)
+        valid_metrics = evaluate(cmodel, device, valid_dataloader, \
+                                 task=args['dataset']['task_name'])
         valid_end_time = time.time()
 
         # Test
         logging.info("=> Computing test metrics...")
         test_metrics_advanced = evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=device) \
             if test_dataset is not None else None
-        test_metrics = evaluate(cmodel, device, test_dataloader) if test_dataloader is not None else None
+        test_metrics = evaluate(cmodel, device, test_dataloader, \
+            task=args['dataset']['task_name']) if test_dataloader is not None else None
 
         # Log metrics
         logging.info(
@@ -432,7 +438,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         logging.info("Sample: \n{}\nEND of Epoch\n=========\n".format(sample_str))
 
 
-@hydra.main(version_base=None, config_path="./", config_name="configs")
+@hydra.main(version_base=None, config_path="./", config_name="configs_mlm")
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
