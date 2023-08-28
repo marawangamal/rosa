@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from datasets import load_dataset
+from datasets import load_dataset, load_metric
 from transformers import DataCollatorWithPadding
 from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
@@ -108,27 +108,21 @@ def get_dataloaders(args, tokenizer):
 
 
 def evaluate(model, device, eval_dataloader, task="cola"):
+    glue_metric = load_metric('glue', task)
+
+    model.eval()
+
+    predictions = []
+    references = []
 
     with torch.no_grad():
-        loss_average_meter = AverageMeter()
-        ppl_average_meter = AverageMeter()
         for batch in eval_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(batch["input_ids"], labels=batch['labels'])
-
-            if len(outputs.loss.shape) > 0:
-                loss = outputs.loss.mean()
-            else:
-                loss = outputs.loss
-
-            loss_average_meter.add(loss.item())
-            ppl_average_meter.add(torch.exp(loss).item())
-
-    return {"loss": loss_average_meter.value,
-            "ppl": ppl_average_meter.value,
-            "bpc": loss_average_meter.value / math.log(2)
-            }
-
+            outputs = model(**batch)
+            predictions.extend(torch.argmax(outputs.logits, dim=-1).tolist())
+            references.extend(batch['labels'].tolist())
+    
+    return glue_metric.compute(predictions=predictions, references=references)
 
 def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
     # Mask gradients
