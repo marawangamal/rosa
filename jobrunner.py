@@ -115,20 +115,27 @@ class SlurmJobManager:
 
         for job in self.jobs:
 
-            if job["command"] in self.status_table["command"].values and not job["command"] in overwrite_commands:
+            #  If job is already running (successfully), skip
+            if (job["command"] in self.status_table["command"].values and
+                    not job["command"] in overwrite_commands and
+                    not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
+                        0].startswith("FAILED") and
+                    not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
+                        0].startswith("CANCELLED")):
+
                 print("Skipping job: {} (Already running)".format(job["group_name"]))
 
             else:
 
-                # Drop row
-                if job["command"] in self.status_table["command"].values and job["command"] in overwrite_commands:
-                    self.status_table = self.status_table[self.status_table["command"] != job["command"]]
+                # Drop previous row
+                # if job["command"] in self.status_table["command"].values and job["command"] in overwrite_commands:
+                #     self.status_table = self.status_table[self.status_table["command"] != job["command"]]
 
                 print("Running job: {}".format(job["group_name"]))
-                os.popen("rm tmp.sh")
-                os.popen("touch tmp.sh")
-                os.popen("echo '{}' >> tmp.sh".format(job["preamble"]))
-                os.popen("echo '{}' >> tmp.sh".format(job["command"]))
+                print(os.popen("rm tmp.sh").read())
+                print(os.popen("touch tmp.sh").read())
+                print(os.popen("echo '{}' >> tmp.sh".format(job["preamble"])).read())
+                print(os.popen("echo '{}' >> tmp.sh".format(job["command"])).read())
 
                 out = os.popen("sbatch tmp.sh").read()
 
@@ -138,11 +145,21 @@ class SlurmJobManager:
                 new_row = {'job_id': job_id, 'group_name': job["group_name"], 'job_status': 'SUBMIT',
                            'preamble': job['preamble'], 'command': job['command']}
 
-                self.status_table = pd.concat([self.status_table, pd.DataFrame([new_row])], ignore_index=True)
+                # Update previous row if exists
+                if job["command"] in self.status_table["command"].values:
+                    # import pdb; pdb.set_trace()
+                    new_row["job_status"] = "{}*".format(new_row["job_status"])
+                    # self.status_table.loc[self.status_table["command"] == job["command"]] = pd.DataFrame([new_row])
+                    mask = self.status_table["command"] == job["command"]
+                    for col, value in new_row.items():
+                        self.status_table.loc[mask, col] = value
+
+                else:
+                    self.status_table = pd.concat([self.status_table, pd.DataFrame([new_row])], ignore_index=True)
 
         outpath = osp.join(osp.expanduser(self.cache_dir), self.cache_file_status)
         df = pd.DataFrame(self.status_table)
-        df.to_csv(outpath)
+        df.to_csv(outpath, index=False)
         print(self.status_table[['job_id', 'job_status', 'command']])
 
     @classmethod
@@ -151,9 +168,14 @@ class SlurmJobManager:
         status_table = pd.read_csv(outpath)
 
         status = []
+
         for job_id in status_table['job_id']:
             out = os.popen("sacct -j {} --format state".format(job_id)).read()
-            status.append(out.split("\n")[2].strip())
+            status_i = out.split("\n")[2].strip()
+            # If status in table ensds with *, then add * to status_i
+            if status_table[status_table['job_id'] == job_id]['job_status'].values[0].endswith("*"):
+                status_i = "{}*".format(status_i)
+            status.append(status_i)
         status_table['job_status'] = status
         status_table.to_csv(outpath)
 
