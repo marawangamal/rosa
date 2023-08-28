@@ -103,26 +103,6 @@ def get_dataloaders(args, tokenizer):
     return train_dataloader, valid_dataloader, test_dataloader, test_dataset
 
 
-def group_texts(examples, block_size=128):
-    # Concatenate all texts across batches. {ids: [List_1, .., List_N]} => [*List_1, ..., *List_N]
-    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-    total_length = len(concatenated_examples[list(examples.keys())[0]])
-
-    # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-    # customize this part to your needs.
-    if total_length >= block_size:
-        total_length = (total_length // block_size) * block_size
-
-    # Split by chunks of block_size.
-    result = {
-        column_name: [column_vals[i: i + block_size] for i in range(0, total_length, block_size)]
-        for column_name, column_vals in concatenated_examples.items()
-    }
-
-    result["labels"] = result["input_ids"].copy()
-    return result
-
-
 def evaluate(model, device, eval_dataloader):
 
     with torch.no_grad():
