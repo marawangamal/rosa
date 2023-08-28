@@ -1,0 +1,39 @@
+runs: 1
+debug: True
+train:
+  epochs: 5
+  lr: 5e-5
+  batch_size: 10
+  fraction: 1.0 # ratio of the training set to use
+  seq_len: 512
+  mark_only_rosa_or_lora_as_trainable: True
+  optimizer:
+    name: adamw # adam, adamw sgd
+    params:
+      momentum: 0.9
+      weight_decay: 0.01
+  scheduler:
+    name: linear # linear, cosine, constant, none
+    params:
+      num_warmup_steps: 500
+model:
+  name: gpt2  # gpt2, gpt2-medium, gpt2-large, gpt2-xl
+fnmodel:
+  name: factorized # factorized, lora, none
+  params:
+    rank: 0.01  # rank of trainable parameters float in (0,1) or int
+    level: epoch  # for factorized only. "epoch", "batch"
+    sample_method: random  # for factorized only. "random", "bottom"
+    collapse_fixed: True # for factorized only. collapse fixed parameters
+logging:
+  print_freq: 100
+  input_size: [8, 512]  # used to compute latency [batch_size, seq_len]
+  memory_info: True  # record memory usage
+output:
+  path: /home/mila/a/aristides.milios/scratch/rosa/runs
+dataset:
+  name: e2e_nlg # options: eli5, e2e_nlg
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
+eval:
+  batch_size: 8
+  experiment: runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9_w0.01_nanone_nu100_namdistillgpt2_namelora_r0.1_leepoch_srandom_t0 # experiment name
