@@ -2,3 +2,7 @@ figures/
 figures_/
 .idea
 .DS_Store
+outputs
+runs
+__pycache__
+factorizednet/__pycache__
