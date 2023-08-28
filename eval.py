@@ -6,7 +6,7 @@ python eval_lorank.py eval.experiment=runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9
 """
 import os
 import os.path as osp
-import math
+import uuid
 import logging
 import torch.nn as nn
 
@@ -92,7 +92,10 @@ def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, to
 def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size=32):
     with torch.no_grad():
         logging.info("=> Testing model bleu scores (Device={}) ...".format(device))
-        BLEU = evaluate.load("bleu")
+        uuid_str = str(uuid.uuid1())
+        BLEU = evaluate.load(
+            "bleu", experiment_id=uuid_str, cache_dir="~/.cache/huggingface/evaluate/{}".format(uuid_str)
+        )
         bleu_average_meter = AverageMeter()
 
         # Initialize model
@@ -150,8 +153,17 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
             ]
 
             # Compute BLEU
-            bleu_score_sum = sum([BLEU.compute(predictions=[output_str], references=[reference])["bleu"] for output_str, reference in zip(output_strs, references)])
-            bleu_average_meter.add(bleu_score_sum, n=len(batch))
+            try:
+                bleu_score_sum = sum([BLEU.compute(predictions=[output_str], references=[reference])["bleu"] for output_str, reference in zip(output_strs, references)])
+                bleu_average_meter.add(bleu_score_sum, n=len(batch))
+            except Exception as e:
+                print("ERROR:")
+                print("input_strs: {}".format(input_strs))
+                print("input_ids: {}".format(inputs['input_ids']))
+                print("output_strs: {}".format(output_strs))
+                print("references: {}".format(references))
+                print(e)
+                raise e
 
         return {
             "bleu": bleu_average_meter.value,
