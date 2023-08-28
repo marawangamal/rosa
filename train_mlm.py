@@ -19,7 +19,7 @@ from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker, preprocess_function
+    CudaMemoryTracker, preprocess_function_mlm
 from eval import evaluate_model_bleu
 
 import factorizednet as fn
@@ -66,7 +66,7 @@ def get_dataloaders(args, tokenizer):
 
     # Apply tokenizer to dataset
     train_tokenized = train_dataset.map(
-        lambda examples: preprocess_function(
+        lambda examples: preprocess_function_mlm(
             examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']
         ),
         batched=True,
@@ -74,13 +74,13 @@ def get_dataloaders(args, tokenizer):
     )
 
     valid_tokenized = valid_dataset.map(
-        lambda examples: preprocess_function(
+        lambda examples: preprocess_function_mlm(
             examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']),
         batched=True
     )
 
     test_tokenized = test_dataset.map(
-        lambda examples: preprocess_function(
+        lambda examples: preprocess_function_mlm(
             examples, tokenizer, dataset_name=args['dataset']['name'], max_length=args['train']['seq_len']),
         batched=True
     )

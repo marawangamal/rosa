@@ -260,7 +260,34 @@ def preprocess_function(examples, tokenizer, dataset_name="eli5", max_length=512
         return output
     else:
         raise NotImplementedError
+    
+task_to_keys = {
+    "cola": ("sentence", None),
+    "mnli": ("premise", "hypothesis"),
+    "mrpc": ("sentence1", "sentence2"),
+    "qnli": ("question", "sentence"),
+    "qqp": ("question1", "question2"),
+    "rte": ("sentence1", "sentence2"),
+    "sst2": ("sentence", None),
+    "stsb": ("sentence1", "sentence2"),
+    "wnli": ("sentence1", "sentence2"),
+}
 
+def preprocess_function_mlm(examples, tokenizer, dataset_name="cola", max_length=512):
+    # tokenize the texts according to the keys for each glue task
+    text_keys = task_to_keys[dataset_name]
+
+    # tokenize the texts, passing two arguments to the tokenizer
+    # if the task has two inputs. otherwise just one
+    if text_keys[1] is not None:
+        output = tokenizer(examples[text_keys[0]], examples[text_keys[1]], max_length=max_length, truncation=True)
+    else:
+        output = tokenizer(examples[text_keys[0]], max_length=max_length, truncation=True)
+    
+    # output["labels"] is just "label" for mlm task
+    output["labels"] = examples["label"]
+
+    return output
 
 def group_texts_old(examples, block_size=128):
     # Concatenate all texts across batches. {ids: [List_1, .., List_N]} => [*List_1, ..., *List_N]
