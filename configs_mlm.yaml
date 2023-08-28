@@ -17,7 +17,7 @@ train:
     params:
       num_warmup_steps: 500
 model:
-  name: gpt2  # gpt2, gpt2-medium, gpt2-large, gpt2-xl
+  name: roberta-base  # or microsoft/deberta-v2-xxlarge eventually
 fnmodel:
   name: factorized # factorized, lora, none
   params:
@@ -32,8 +32,9 @@ logging:
 output:
   path: /home/mila/a/aristides.milios/scratch/rosa/runs
 dataset:
-  name: e2e_nlg # options: eli5, e2e_nlg
+  name: glue
+  task: cola
   cache: /home/mila/a/aristides.milios/scratch/hf_cache
 eval:
   batch_size: 8
-  experiment: runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9_w0.01_nanone_nu100_namdistillgpt2_namelora_r0.1_leepoch_srandom_t0 # experiment name
+  experiment: runs/glue/cola/roberta-base_factorized_0.01_epoch_random_1.0_5e-05_5_1
