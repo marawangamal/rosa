@@ -93,9 +93,7 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
     with torch.no_grad():
         logging.info("=> Testing model bleu scores (Device={}) ...".format(device))
         uuid_str = str(uuid.uuid1())
-        BLEU = evaluate.load(
-            "bleu", experiment_id=uuid_str, cache_dir="~/.cache/huggingface/evaluate/{}".format(uuid_str)
-        )
+        BLEU = evaluate.load("bleu", experiment_id=uuid_str, cache_dir="~/.cache/huggingface/evaluate/{}".format(uuid_str))
         bleu_average_meter = AverageMeter()
 
         # Initialize model
@@ -153,17 +151,13 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
             ]
 
             # Compute BLEU
-            try:
-                bleu_score_sum = sum([BLEU.compute(predictions=[output_str], references=[reference])["bleu"] for output_str, reference in zip(output_strs, references)])
-                bleu_average_meter.add(bleu_score_sum, n=len(batch))
-            except Exception as e:
-                print("ERROR:")
-                print("input_strs: {}".format(input_strs))
-                print("input_ids: {}".format(inputs['input_ids']))
-                print("output_strs: {}".format(output_strs))
-                print("references: {}".format(references))
-                print(e)
-                raise e
+            for output_str, reference in zip(output_strs, references):
+                if len(" ".strip()) == 0:
+                    bleu_score = 0
+                else:
+                    results = BLEU.compute(predictions=[output_str], references=[reference])
+                    bleu_score = results["bleu"]
+                bleu_average_meter.add(bleu_score)
 
         return {
             "bleu": bleu_average_meter.value,

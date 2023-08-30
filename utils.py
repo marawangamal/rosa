@@ -191,6 +191,8 @@ class AverageMeter:
 
     @property
     def value(self):
+        if self.pts == 0:
+            return 0
         return self.sum / self.pts
 
 
