@@ -152,7 +152,7 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
 
             # Compute BLEU
             for output_str, reference in zip(output_strs, references):
-                if len(" ".strip()) == 0:
+                if len(output_str.strip()) == 0:
                     bleu_score = 0
                 else:
                     results = BLEU.compute(predictions=[output_str], references=[reference])

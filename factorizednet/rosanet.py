@@ -17,9 +17,17 @@ class RosaNet(nn.Module):
         assert (target is None) or (delta is None), "target and delta cannot be specified together"
         assert (target is not None) == (steps is not None), "target and steps must be specified"
 
+        # todo: refactor this. dont need this dict since its RosaNet only now
         self.factorized_modules = {
-            "Conv1D": RosaLinear  # Name of the linear module found in GPT2 models
+            "Conv1D": RosaLinear,  # Name of the linear module found in GPT2 models
+            "Linear": RosaLinear  # Name of the linear module found in GPT2 models
         }
+
+        self.fan_in_fan_out_map = {
+            "Conv1D": True,
+            "Linear": False
+        }
+
         self.ignore = ignore if ignore is not None else list()
         self.run_stats = dict()
         self.make_copy = make_copy
@@ -147,7 +155,7 @@ class RosaNet(nn.Module):
 
         return df
 
-    def _factorize_model(self, model):
+    def _factorize_model(self, model: nn.Module) -> nn.Module:
         # start_time = time.time()
         self._report = self._build_report(model)
         for name, layer in model.named_modules():
@@ -162,7 +170,9 @@ class RosaNet(nn.Module):
             self._report.at[name, 'fix'] = original_params_fixed
 
             if ltype in self.factorized_modules.keys() and name not in self.ignore:
-                factorized_module = self.factorized_modules[ltype].from_module(layer)
+                factorized_module = self.factorized_modules[ltype].from_module(
+                    layer, fan_in_fan_out=self.fan_in_fan_out_map[ltype]
+                )
                 replacement_address = self._parse_model_addr(name)
 
                 factorized_trainable = self.get_num_params(factorized_module, trainable=True)

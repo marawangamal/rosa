@@ -58,22 +58,17 @@ class RosaLinear(FactorizedLayer):
     def from_module(cls, linear_layer, fan_in_fan_out=True):
         """ Initialize from a nn.Linear/Conv1D module """
 
-        w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f]
+        w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f] if fan_in_fan_out
+        w = w if fan_in_fan_out else w.T
         bias = linear_layer.bias.data if linear_layer.bias is not None else None
-        u, s, vt = torch.linalg.svd(w, full_matrices=False)  # [out_f, r],[r,],[r, in_f] or [in_f, r],[r,],[r, out_f]
 
-        if fan_in_fan_out:  # Conv1D
-            # a = torch.sqrt(s).reshape(1, -1) * u  # [in_f, r]
-            # b = torch.sqrt(s).reshape(-1, 1) * vt  # [r, out_f]
-            a = s.reshape(1, -1) * u
-            b = vt
-            w_hat = a @ b
-        else:
-            # b = (torch.sqrt(s).reshape(1, -1) * u).T  # [out_f, r] => [r, out_f]
-            # a = (torch.sqrt(s).reshape(-1, 1) * vt).T  # [r, in_f] => [in_f, r]
-            a = s.reshape(1, -1) * u
-            b = vt
-            w_hat = b @ a
+        u, s, vt = torch.linalg.svd(
+            w, full_matrices=False
+        )  # [in_f, r],[r,],[r, out_f]
+
+        a = s.reshape(1, -1) * u
+        b = vt
+        w_hat = a @ b
 
         # Check reconstruction error
         assert torch.allclose(w, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
@@ -152,8 +147,6 @@ class RosaLinear(FactorizedLayer):
                     w_tot = self.rosa_a_trainable @ self.rosa_b_trainable
                     w_tot = w_tot + self.rosa_w_fixed if self.rosa_w_fixed is not None else w_tot
                     u, s, vt = torch.linalg.svd(w_tot, full_matrices=False)
-                    # a = torch.sqrt(s).reshape(1, -1) * u  # [in_f, full_rank]
-                    # b = torch.sqrt(s).reshape(-1, 1) * vt  # [full_rank, out_f]
                     a = s.reshape(1, -1) * u  # [in_f, full_rank]
                     b = vt  # [full_rank, out_f]
 

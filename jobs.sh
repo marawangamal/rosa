@@ -6,13 +6,14 @@
 #SBATCH -x cn-g[005-012,017-026]
 
 # 1. Load the required modules
-#module load python/3.8
+module load python/3.8
 
 # 2. Load your environment
-#source /home/mila/m/marawan.gamal/.venv/rosa/bin/activate
+source /home/mila/m/marawan.gamal/.venv/rosa/bin/activate
 
 # 3. Copy your dataset on the compute node
-#cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
+cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
+
 
 # Best models
 # ROSA (2.298 PPL valid)
