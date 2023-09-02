@@ -234,8 +234,8 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
             n_trainable_params = get_num_trainable_params(model)
 
         # Forward pass
-        import pdb; pdb.set_trace()  # todo: need to handle stsb regression task
-        outputs = model(batch["input_ids"])
+        # import pdb; pdb.set_trace()  # todo: need to handle stsb regression task
+        outputs = model(batch["input_ids"], labels=batch["labels"])
         cuda_memory_tracker.track("[train_epoch] After forward")
         latency_report.stop(name="forward")
 
