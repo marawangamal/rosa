@@ -121,10 +121,10 @@ class RosaLinear(FactorizedLayer):
             pdb.set_trace()
 
     @staticmethod
-    def ratio2int(rank_ratio, max_rank):
+    def ratio2int(rank_ratio, max_rank, min_rank=1):
         """ Convert a ratio to an integer"""
-        assert 0 < rank_ratio <= 1, "r must be a float between 0 and 1"
-        return int(rank_ratio * max_rank)
+        assert 0 < rank_ratio <= 1, "`rank_ratio` must be a float between 0 and 1"
+        return max(int(rank_ratio * max_rank), min_rank)
 
     def sample_trainable(self, rank=0, method='random', collapse_fixed=True):
         """ Mask gradients of the trainable parameters
