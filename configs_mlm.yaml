@@ -33,7 +33,7 @@ output:
   path: /home/mila/m/marawan.gamal/scratch/rosa/runs
 dataset:
   name: glue
-  task_name: stsb
+  task_name: mnli
   cache: /home/mila/m/marawan.gamal/scratch/hf_cache
 eval:
   batch_size: 8

@@ -42,22 +42,39 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
 }
 
+task_to_split = {
+    "mnli": {
+        "train": "train",
+        "validation": "validation_matched",
+        "test": "validation_matched"
+    },
+    "stsb": {
+        "train": "train",
+        "validation": "validation",
+        "test": "validation"
+    },
+}
+
+
 def get_dataloaders(args, tokenizer):
     # Load dataset
     assert args['dataset']['name'] == 'glue', "Dataset not supported"
     assert args['dataset']['task_name'] in task_to_keys.keys(), "Task not supported"
 
     train_dataset = load_dataset(
-        args['dataset']['name'], args['dataset']['task_name'], split="train",
+        args['dataset']['name'], args['dataset']['task_name'],
+        split=task_to_split[args['dataset']['task_name']]['train'],
         cache_dir=args['dataset']['cache']
     )
     test_dataset = load_dataset(
-        args['dataset']['name'], args['dataset']['task_name'], split="test",
+        args['dataset']['name'], args['dataset']['task_name'],
+        split=task_to_split[args['dataset']['task_name']]['test'],
         cache_dir=args['dataset']['cache']
     )
     valid_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
-        split="validation", cache_dir=args['dataset']['cache']
+        split=task_to_split[args['dataset']['task_name']]['validation'],
+        cache_dir=args['dataset']['cache']
     )
 
     # Filter for faster training (debug)
