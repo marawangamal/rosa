@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from datasets import load_dataset, load_metric
 from transformers import DataCollatorWithPadding
 from transformers import AutoTokenizer, get_scheduler
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoModel, AutoModelForSequenceClassification
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function_mlm
@@ -217,8 +217,8 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
             n_trainable_params = get_num_trainable_params(model)
 
         # Forward pass
-        # import pdb; pdb.set_trace()
-        outputs = model(batch["input_ids"], labels=batch['labels'])
+        import pdb; pdb.set_trace()  # todo: need to handle stsb regression task
+        outputs = model(batch["input_ids"])
         cuda_memory_tracker.track("[train_epoch] After forward")
         latency_report.stop(name="forward")
 
@@ -481,7 +481,7 @@ def main(cfg: DictConfig):
     cuda_memory_tracker = CudaMemoryTracker()
     cuda_memory_tracker.track('[main] Initial')
 
-    model = AutoModelForCausalLM.from_pretrained(args['model']['name'])
+    model = AutoModelForSequenceClassification.from_pretrained(args['model']['name'])
     tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
     tokenizer.pad_token = tokenizer.eos_token
     # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
