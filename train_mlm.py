@@ -16,7 +16,8 @@ from torch.utils.tensorboard import SummaryWriter
 from datasets import load_dataset, load_metric
 from transformers import DataCollatorWithPadding
 from transformers import AutoTokenizer, get_scheduler
-from transformers import AutoModelForCausalLM, AutoModel, AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification
+from transformers import AutoConfig
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function_mlm
@@ -498,11 +499,29 @@ def main(cfg: DictConfig):
     cuda_memory_tracker = CudaMemoryTracker()
     cuda_memory_tracker.track('[main] Initial')
 
-    model = AutoModelForSequenceClassification.from_pretrained(args['model']['name'])
-    tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
-    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer = AutoTokenizer.from_pretrained(
+        args['model']['name'],
+        cache_dir=args['model']['cache'],
+        use_fast=True
+    )
+
     # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
     train_dataloader, valid_dataloader, test_dataloader, test_dataset = get_dataloaders(args, tokenizer)
+
+    num_labels = len(train_dataloader.dataset.unique('labels')) 
+
+    config = AutoConfig.from_pretrained(
+        args['model']['name'],
+        cache_dir=args['model']['cache'],
+        num_labels=num_labels,
+    )
+
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args['model']['name'],
+        config=config,
+        cache_dir=args['model']['cache']
+    )
+
     # import pdb; pdb.set_trace()
     logging.info("Model:\n{}".format(model))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

@@ -18,6 +18,7 @@ train:
       num_warmup_steps: 500
 model:
   name: roberta-base  # or microsoft/deberta-v2-xxlarge eventually
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
 fnmodel:
   name: none # rosa, lora, none
   params:
@@ -30,11 +31,11 @@ logging:
   input_size: [8, 512]  # used to compute latency [batch_size, seq_len]
   memory_info: True  # record memory usage
 output:
-  path: /home/mila/m/marawan.gamal/scratch/rosa/runs
+  path: /home/mila/a/aristides.milios/scratch/rosa/runs
 dataset:
   name: glue
   task_name: mnli
-  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
 eval:
   batch_size: 8
   experiment: runs/glue/cola/roberta-base_factorized_0.01_epoch_random_1.0_5e-05_5_1
