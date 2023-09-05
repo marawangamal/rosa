@@ -21,7 +21,6 @@ from transformers import AutoConfig
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function_mlm
-from eval import evaluate_model_bleu
 
 import factorizednet as fn
 import pandas as pd
@@ -78,6 +77,9 @@ def get_dataloaders(args, tokenizer):
         cache_dir=args['dataset']['cache']
     )
 
+    # take a small subset of the training set for debugging purposes
+    train_dataset = train_dataset.select(range(1000))
+
     # Filter for faster training (debug)
     num_train_pts, _ = train_dataset.shape
     train_dataset = train_dataset.select(range(int(num_train_pts * args['train']['fraction'])))
@@ -122,7 +124,9 @@ def get_dataloaders(args, tokenizer):
         test_tokenized_reduced, batch_size=args['train']['batch_size'], collate_fn=data_collator
     )
 
-    return train_dataloader, valid_dataloader, test_dataloader, test_dataset
+    # tweak for now since we can't evaluate on test (it's private there's no labels)
+    #return train_dataloader, valid_dataloader, test_dataloader, test_dataset
+    return train_dataloader, valid_dataloader, None, None
 
 
 def evaluate(model, device, eval_dataloader, task="cola"):
@@ -347,8 +351,6 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         # Test
         logging.info("=> Computing test metrics...")
-        test_metrics_advanced = evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=device) \
-            if test_dataset is not None else None
         test_metrics = evaluate(cmodel, device, test_dataloader, \
             task=args['dataset']['task_name']) if test_dataloader is not None else None
 
@@ -360,8 +362,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             )
             + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | "
             + " | ".join([f"Valid {k}: {v:.2f}" for k, v in valid_metrics.items()]) + " | "
-            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics.items()]) + " | "
-            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics_advanced.items()])
+            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics.items()]) + " | " if test_metrics is not None else ""
         )
         logging.info(cuda_memory_tracker.report())
 
@@ -384,7 +385,18 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         }
 
         # Save model checkpoint
-        if best_valid_metrics is None or valid_metrics['loss'] < best_valid_metrics['loss']:
+
+        # set metric_key depending on the glue task
+        # cola uses 'matthews_correlation'
+        # stsb uses spearmanr
+        # all others use 'accuracy'
+        metric_key = 'accuracy'
+        if args['dataset']['task_name'] == 'cola':
+            metric_key = 'matthews_correlation'
+        elif args['dataset']['task_name'] == 'stsb':
+            metric_key = 'spearmanr'
+
+        if best_valid_metrics is None or valid_metrics[metric_key] < best_valid_metrics[metric_key]:
             best_valid_metrics = valid_metrics
             torch.save(ckpt, osp.join(output_path, "model_best.pth"))
             torch.save(ckpt, osp.join(output_path, "model_latest.pth"))
@@ -408,11 +420,6 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 if m is not None:
                     writer.add_scalar("test/{}".format(m), test_metrics[m], i_epoch)
 
-        if test_metrics_advanced is not None:
-            for m in test_metrics_advanced.keys():
-                if m is not None:
-                    writer.add_scalar("test/{}".format(m), test_metrics_advanced[m], i_epoch)
-
         writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], i_epoch)
 
         # Get trainable parameters
@@ -426,28 +433,11 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             [f"{k}: {v:.2f}" for k, v in best_valid_metrics.items()]
         ))
 
-        # Sample
-        prompt = {
-            "eli5": "Somatic hypermutation allows the immune system to",
-            "e2e_nlg": "name[Blue Spice], eatType[coffee shop], area[city centre]",
-        }[args["dataset"]["name"]]
-
-        inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
         model_fn = model_fn.factorized_model if isinstance(model_fn, fn.RosaNet) else model_fn
         model_fn = model_fn.factorized_model if isinstance(model_fn, fn.LoraNet) else model_fn
-        outputs = model_fn.generate(
-            inputs,
-            max_length=args['train']['seq_len'],
-            num_beams=5,
-            no_repeat_ngram_size=2,
-            early_stopping=True,
-            pad_token_id=tokenizer.eos_token_id,
-            eos_token_id=tokenizer.eos_token_id
-        )
-        sample_str = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0].strip()
-        writer.add_text('Sample', sample_str, i_epoch)
-        logging.info("Sample: \n{}\nEND of Epoch\n=========\n".format(sample_str))
+
+        logging.info("\nEND of Epoch\n=========\n")
 
 
 @hydra.main(version_base=None, config_path="./", config_name="configs_mlm")
