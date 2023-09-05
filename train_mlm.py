@@ -78,7 +78,7 @@ def get_dataloaders(args, tokenizer):
     )
 
     # take a small subset of the training set for debugging purposes
-    train_dataset = train_dataset.select(range(1000))
+    # train_dataset = train_dataset.select(range(1000))
 
     # Filter for faster training (debug)
     num_train_pts, _ = train_dataset.shape
