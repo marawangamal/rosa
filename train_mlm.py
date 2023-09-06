@@ -22,7 +22,7 @@ from transformers import AutoConfig
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function_mlm
 
-import factorizednet as fn
+import peftnet as fn
 import pandas as pd
 
 pd.set_option('display.max_rows', None)
@@ -146,6 +146,7 @@ def evaluate(model, device, eval_dataloader, task="cola"):
     
     return glue_metric.compute(predictions=predictions, references=references)
 
+
 def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
     # Mask gradients
     model = model.module.sample_trainable() if isinstance(model, nn.DataParallel) else model.sample_trainable()
@@ -173,18 +174,6 @@ def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_tr
     return model, optimizer, lr_scheduler
 
 
-def mark_only_rosa_or_lora_as_trainable(model, verbose=False):
-    for name, param in model.named_parameters():
-        if ("rosa" in name and "fixed" not in name) or "lora" in name:
-            param.requires_grad = True
-            if verbose:
-                print("+ Marked {} as trainable".format(name))
-        else:
-            if verbose:
-                print("- Marked {} as not trainable".format(name))
-            param.requires_grad = False
-
-
 def get_num_trainable_params(model):
     n_trainable_params = 0
     for name, param in model.named_parameters():
@@ -200,8 +189,7 @@ def printmodel(model):
 def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, epoch, print_freq=10,
                 report_latency=True, steps_counter=0, writer=None):
     loss_average_meter = AverageMeter()
-    ppl_average_meter = AverageMeter()
-
+    # ppl_average_meter = AverageMeter()
     latency_report = LatencyReport()
 
     cuda_memory_tracker = CudaMemoryTracker()
@@ -215,9 +203,6 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
     # Get trainable parameters
     n_trainable_params = get_num_trainable_params(model)
-
-    if args['train']['mark_only_rosa_or_lora_as_trainable'] and not args['fnmodel']['name'] == 'none':
-        mark_only_rosa_or_lora_as_trainable(model, verbose=False)
 
     for i_step, batch in enumerate(train_dataloader):
 
@@ -250,6 +235,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
             loss = outputs.loss
         latency_report.stop(name="loss.mean()")
 
+        # import pdb; pdb.set_trace()
         loss.backward()
         cuda_memory_tracker.track("[train_epoch] After loss.backward()")
         latency_report.stop(name="loss.backward()")
@@ -266,17 +252,14 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
         if i_step % print_freq == 0:
             logging.info(
-                "\tEpoch {:4d} | step {:4d}/{:4d} | trainable: {:,} | lr: {:.6f} | loss {:5.2f} | ppl {:8.2f} | "
-                "bpc {:8.2f}".format(
+                "\tEpoch {:4d} | step {:4d}/{:4d} | trainable: {:,} | lr: {:.6f} | loss {:5.2f} ".format(
                     epoch, i_step, len(train_dataloader), n_trainable_params, optimizer.param_groups[0]['lr'],
-                    loss.item(), torch.exp(loss).item(),
-                    loss.item() / math.log(2)
-                ) + ("" if not report_latency else " | " + latency_report.report())
+                    loss.item()) + ("" if not report_latency else " | " + latency_report.report())
             )
             logging.info("{}\n".format(cuda_memory_tracker.report()))
 
         loss_average_meter.add(loss.item())
-        ppl_average_meter.add(torch.exp(loss).item())
+        # ppl_average_meter.add(torch.exp(loss).item())
         steps_counter += 1
 
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
@@ -292,9 +275,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
         for i, (k, v) in enumerate(cuda_memory_tracker.memory_reserved.items()):
             writer.add_scalar("train_epoch/memory_reserved", curr_step(epoch, i))
 
-    return {"loss": loss_average_meter.value,
-            "ppl": ppl_average_meter.value,
-            "bpc": loss_average_meter.value / math.log(2)}, optimizer
+    return {"loss": loss_average_meter.value}, optimizer
 
 
 def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device, output_path,
@@ -434,8 +415,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         ))
 
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.factorized_model if isinstance(model_fn, fn.RosaNet) else model_fn
-        model_fn = model_fn.factorized_model if isinstance(model_fn, fn.LoraNet) else model_fn
+        model_fn = model_fn.peft_model if isinstance(model_fn, fn.RosaNet) else model_fn
+        model_fn = model_fn.peft_model if isinstance(model_fn, fn.LoraNet) else model_fn
 
         logging.info("\nEND of Epoch\n=========\n")
 

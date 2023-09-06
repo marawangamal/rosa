@@ -1,15 +1,53 @@
 import copy
-import math
-import time
-import torch
+from typing import Union
 
 import torch.nn as nn
 import pandas as pd
 
-from factorizednet.factorized_module.rosa_linear import RosaLinear
+from peftnet.peft_module.rosa_linear import RosaLinear
+from peftnet._peftnet import PEFTNet
 
 
-class RosaNet(nn.Module):
+class RosaNet(PEFTNet):
+    def __init__(
+            self,
+            model: nn.Module,
+            rank: Union[int, float],
+            ignore_list: list = None,
+            factorize_list: list = None,
+            *args, **kwargs
+    ):
+        """ ROSA PEFT model for efficient adaptation of linear layers
+
+        Args:
+            model: model to be factorized
+            rank: rank of factorized matrices
+            ignore_list: names of layers to ignore
+            factorize_list: names of modules types to replace
+
+        """
+        super().__init__(
+            model, ignore_list, factorize_list, replacement_module=RosaLinear, replacement_kwargs=dict(rank=rank)
+        )
+
+        # ROSA Model initializes low rank matrices with values obtained from SVD
+        self.factorize()
+
+    # def load_state_dict(self, state_dict: dict, strict: bool = True) -> None:
+    #
+    #     for name, layer in self.peft_model.named_modules():
+    #         if isinstance(layer, self.replacement_module):
+    #             import pdb; pdb.set_trace()
+    #             prefix = ".".join(["_factorized_model", name]) + "."
+    #             layer_state_dict = {k.replace(prefix, ""): v for k, v in state_dict.items() if k.startswith(prefix)}
+    #             factorized_module = layer.from_state_dict(
+    #                 layer_state_dict
+    #             )
+    #             replacement_address = self._parse_model_addr(name)
+    #             self._set_module(self._factorized_model, replacement_address, factorized_module)
+
+
+class RosaNetOld(nn.Module):
     def __init__(self, model, ignore=None,
                  delta=None, target=None, steps=None, warmup_steps=0,
                  rank=None, sample_method=None, collapse_fixed=None, make_copy=False, **kwargs):
@@ -239,3 +277,4 @@ class RosaNet(nn.Module):
 
     def forward(self, *args, **kwargs):
         return self._factorized_model(*args, **kwargs)
+

@@ -22,7 +22,7 @@ from utils import get_num_params, get_experiment_name, get_latency, AverageMeter
     CudaMemoryTracker, preprocess_function
 from eval import evaluate_model_bleu
 
-import factorizednet as fn
+import peftnet as pn
 import pandas as pd
 
 pd.set_option('display.max_rows', None)
@@ -150,7 +150,8 @@ def evaluate(model, device, eval_dataloader):
 
 def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
     # Mask gradients
-    model = model.module.sample_trainable() if isinstance(model, nn.DataParallel) else model.sample_trainable()
+    # model = model.module.sample_trainable() if isinstance(model, nn.DataParallel) else model.sample_trainable()
+    model = model.module.factorize() if isinstance(model, nn.DataParallel) else model.factorize()
 
     # New optimizer
     opt_cls = optimizer.__class__
@@ -218,8 +219,8 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
     # Get trainable parameters
     n_trainable_params = get_num_trainable_params(model)
 
-    if args['train']['mark_only_rosa_or_lora_as_trainable'] and not args['fnmodel']['name'] == 'none':
-        mark_only_rosa_or_lora_as_trainable(model, verbose=False)
+    # if args['train']['mark_only_rosa_or_lora_as_trainable'] and not args['fnmodel']['name'] == 'none':
+    #     mark_only_rosa_or_lora_as_trainable(model, verbose=False)
 
     for i_step, batch in enumerate(train_dataloader):
 
@@ -282,7 +283,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
         steps_counter += 1
 
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
-    if isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet):
+    if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
         df = model_fn.get_report()
         logging.info(df)
         logging.info(model_fn)
@@ -438,8 +439,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.factorized_model if isinstance(model_fn, fn.RosaNet) else model_fn
-        model_fn = model_fn.factorized_model if isinstance(model_fn, fn.LoraNet) else model_fn
+        model_fn = model_fn.peft_model if isinstance(model_fn, pn.RosaNet) else model_fn
+        model_fn = model_fn.peft_model if isinstance(model_fn, pn.LoraNet) else model_fn
         outputs = model_fn.generate(
             inputs,
             max_length=args['train']['seq_len'],
@@ -529,7 +530,7 @@ def main(cfg: DictConfig):
     # Factorize model either using ROSA or LORA
     logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
     cmodel = {
-        "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
+        "rosa": pn.RosaNet, "lora": pn.LoraNet, "none": lambda x, **kwargs: x
     }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
     logging.info("Factorized Model:\n{}".format(cmodel))
 

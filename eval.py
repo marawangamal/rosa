@@ -17,7 +17,7 @@ import string
 
 import torch
 
-import factorizednet as fn
+import peftnet as fn
 from datasets import load_dataset
 from transformers.pipelines.pt_utils import KeyDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
@@ -41,7 +41,7 @@ def get_data(dataset_name, dataset_cache):
 def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer, device=None):
     # Evaluate model
     model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-    model_fn = model_fn.factorized_model if (isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) \
+    model_fn = model_fn.peft_model if (isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) \
         else model_fn
     predictor = pipeline(
         'text-generation',
@@ -99,7 +99,7 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
         # Initialize model
         cmodel.to(device)
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.factorized_model if (
+        model_fn = model_fn.peft_model if (
                     isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) else model_fn
         model_fn.eval()
 
@@ -170,7 +170,7 @@ def evaluate_model_bleu_datapoint(cmodel, test_dataset, tokenizer, device=None, 
 
     # Initialize model
     model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-    model_fn = model_fn.factorized_model if (
+    model_fn = model_fn.peft_model if (
                 isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) else model_fn
 
     # Set the device
@@ -223,7 +223,7 @@ def evaluate_model_bleu_old(cmodel, test_dataset, tokenizer, device=None, batch_
 
         # Initialize model
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.factorized_model if (
+        model_fn = model_fn.peft_model if (
                     isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) else model_fn
         model_fn.eval()
 

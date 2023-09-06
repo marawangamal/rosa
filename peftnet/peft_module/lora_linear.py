@@ -69,26 +69,27 @@ class LoraLinear(nn.Module):
             nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
             nn.init.zeros_(self.lora_B)
 
+    @staticmethod
+    def ratio2int(rank_ratio, max_rank, min_rank=1):
+        """ Convert a ratio to an integer"""
+        assert 0 < rank_ratio <= 1, "`rank_ratio` must be a float between 0 and 1"
+        return max(int(rank_ratio * max_rank), min_rank)
+
+
     @classmethod
     def from_module(cls, linear_layer, rank=1, fan_in_fan_out=True):
 
         assert 0 < rank < 1 or isinstance(rank, int), "r must be a float between 0 and 1 or an integer"
-
-        if fan_in_fan_out:  # fan_in_fan_out
-            in_feat, out_feat = linear_layer.weight.data.shape  # Conv1D
-        else:
-            in_feat, out_feat = linear_layer.weight.data.T.shape  # nn.Linear
-
         assert linear_layer.weight.data is not None, "The layer must have a weight matrix"
 
-        w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f]
+        w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f] if fan_in_fan_out
+        w = w if fan_in_fan_out else w.T
         bias = linear_layer.bias.data if linear_layer.bias is not None else None
-
-        if rank < 1:
-            rank = int(rank * min(in_feat, out_feat))
+        full_rank = min(w.size(0), w.size(1))
+        rank = cls.ratio2int(rank, full_rank) if rank < 1 else rank
 
         return cls(
-            in_features=in_feat, out_features=out_feat, init_w=w, init_bias=bias, fan_in_fan_out=fan_in_fan_out,
+            in_features=w.size(0), out_features=w.size(1), init_w=w, init_bias=bias, fan_in_fan_out=fan_in_fan_out,
             rank=rank
         )
 
@@ -435,3 +436,97 @@ class Conv2d(nn.Conv2d, LoRALayer):
                 self.bias, self.stride, self.padding, self.dilation, self.groups
             )
         return nn.Conv2d.forward(self, x)
+
+
+class LoraLinear2(nn.Module):
+    def __init__(self, in_features, out_features, rank=1.0, bias=False):
+        super().__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.rank = rank if isinstance(rank, int) else int(rank * min(in_features, out_features))
+        self.bias = nn.Parameter(torch.zeros(out_features, 1)) if bias else None
+        self.a = nn.Parameter(torch.zeros(in_features, self.rank))
+        self.b = nn.Parameter(torch.randn(self.rank, out_features))
+        self.w = nn.Parameter(torch.randn(in_features, out_features))
+        self.merged = True
+
+    def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None):
+        self.a.data = a_init if a_init is not None else self.a.data
+        self.b.data = b_init if b_init is not None else self.b.data
+        self.w.data = w_init if w_init is not None else self.w.data
+
+    @classmethod
+    def from_module(cls, linear_layer: nn.Module, rank=1.0, fan_in_fan_out=True) -> nn.Module:
+        """Initialize from a nn.Linear/Conv1D module """
+
+        w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f] if fan_in_fan_out
+        w = w if fan_in_fan_out else w.T
+        bias = linear_layer.bias.data if linear_layer.bias is not None else None
+
+        # Initialize
+        obj = cls(
+            in_features=w.size(0), out_features=w.size(1), rank=rank, bias=bias is not None
+        )
+        obj.initialize_weights(w_init=w)
+        return obj
+
+    def merge(self):
+        """Convert to merged format"""
+        # Merge w and ab
+        self.w.data = self.a.data @ self.b.data + self.w.data
+
+        # Make a, b fixed and w trainable
+        self.a.requires_grad = False
+        self.b.requires_grad = False
+        self.w.requires_grad = True
+
+        # Toggle merged flag
+        self.merged = True
+
+    def factorize(self):
+        if not self.merged:
+            self.merge()
+
+        # Factorize
+        u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
+        a = s.reshape(1, -1) * u
+        b = vt
+        w_hat = a @ b
+
+        # Check reconstruction error
+        assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
+
+        # Sample trainable params (Random)
+        full_rank = min(self.w.shape)
+        rank = self.rank
+        start_idx = torch.randint(0, full_rank - rank, (1,)).item()
+        end_idx = start_idx + rank
+        grad_indices = torch.arange(start_idx, end_idx)
+        non_grad_indices = [i for i in range(full_rank) if i not in grad_indices]
+
+        # Mask gradients
+        init_a_trainable = a[:, grad_indices]  # [in_f, r']
+        init_b_trainable = b[grad_indices, :]  # [r', out_f]
+        init_a_fixed = a[:, non_grad_indices]
+        init_b_fixed = b[non_grad_indices, :]
+        init_w = init_a_fixed @ init_b_fixed
+
+        # Initialize
+        self.a.data = init_a_trainable
+        self.b.data = init_b_trainable
+        self.w.data = init_w
+
+        # Make a, b trainable and w fixed
+        self.a.requires_grad = True
+        self.b.requires_grad = True
+        self.w.requires_grad = False
+
+        # Toggle merged flag
+        self.merged = False
+
+    def forward(self, x):
+        if self.merged:
+            return x @ self.w + self.bias
+        else:
+            return x @ self.a @ self.b + x @ self.w + self.bias

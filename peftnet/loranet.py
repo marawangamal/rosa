@@ -1,18 +1,50 @@
 import copy
-import time
+from typing import Union
 
 import torch.nn as nn
 import pandas as pd
 
-from factorizednet.factorized_module.lora_linear import LoraLinear
+from peftnet.peft_module.lora_linear import LoraLinear
+from peftnet.peft_module.rosa_linear import RosaLinear
+from peftnet._peftnet import PEFTNet
 
 
-class LoraNet(nn.Module):
+class LoraNet(PEFTNet):
+    def __init__(
+            self,
+            model: nn.Module,
+            rank: Union[int, float],
+            ignore_list: list = None,
+            factorize_list: list = None,
+            *args, **kwargs
+    ):
+        """ Lora PEFT model for efficient adaptation of linear layers
+
+        Args:
+            model: model to be factorized
+            rank: rank of factorized matrices
+            ignore_list: names of layers to ignore
+            factorize_list: names of modules types to replace
+
+        """
+        super().__init__(
+            model, ignore_list, factorize_list, replacement_module=RosaLinear, replacement_kwargs=dict(rank=rank)
+        )
+
+
+class LoraNetOld(nn.Module):
     def __init__(self, model, ignore=None, rank=1, verbose=False, **kwargs):
         super(LoraNet, self).__init__()
         self.replacements = {
-            "Conv1D": LoraLinear
+            "Conv1D": LoraLinear,
+            "Linear": LoraLinear  # Name of the linear module found in GPT2 models
         }
+
+        self.fan_in_fan_out_map = {
+            "Conv1D": True,
+            "Linear": False
+        }
+
         self.rank = rank
         self.ignore = ignore if ignore is not None else list()
         self._report = pd.DataFrame()
@@ -110,7 +142,9 @@ class LoraNet(nn.Module):
             self._report.at[name, 'fix'] = original_params_fixed
 
             if ltype in self.replacements.keys() and name not in self.ignore:
-                lora_module = self.replacements[ltype].from_module(layer, rank=rank)
+                lora_module = self.replacements[ltype].from_module(
+                    layer, rank=rank, fan_in_fan_out=self.fan_in_fan_out_map[ltype]
+                )
                 replacement_address = self._parse_model_addr(name)
 
                 lora_trainable = self.get_num_params(lora_module, trainable=True)
