@@ -27,24 +27,14 @@ class RosaNet(PEFTNet):
 
         """
         super().__init__(
-            model, ignore_list, factorize_list, replacement_module=RosaLinear, replacement_kwargs=dict(rank=rank)
+            model, ignore_list,
+            factorize_list,
+            replacement_module=RosaLinear,
+            replacement_kwargs=dict(rank=rank)
         )
 
         # ROSA Model initializes low rank matrices with values obtained from SVD
         self.factorize()
-
-    # def load_state_dict(self, state_dict: dict, strict: bool = True) -> None:
-    #
-    #     for name, layer in self.peft_model.named_modules():
-    #         if isinstance(layer, self.replacement_module):
-    #             import pdb; pdb.set_trace()
-    #             prefix = ".".join(["_factorized_model", name]) + "."
-    #             layer_state_dict = {k.replace(prefix, ""): v for k, v in state_dict.items() if k.startswith(prefix)}
-    #             factorized_module = layer.from_state_dict(
-    #                 layer_state_dict
-    #             )
-    #             replacement_address = self._parse_model_addr(name)
-    #             self._set_module(self._factorized_model, replacement_address, factorized_module)
 
 
 class RosaNetOld(nn.Module):

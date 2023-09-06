@@ -18,7 +18,7 @@ class LoraNet(PEFTNet):
             factorize_list: list = None,
             *args, **kwargs
     ):
-        """ Lora PEFT model for efficient adaptation of linear layers
+        """ LoRa PEFT model for efficient adaptation of linear layers
 
         Args:
             model: model to be factorized
@@ -28,7 +28,11 @@ class LoraNet(PEFTNet):
 
         """
         super().__init__(
-            model, ignore_list, factorize_list, replacement_module=RosaLinear, replacement_kwargs=dict(rank=rank)
+            model,
+            ignore_list,
+            factorize_list,
+            replacement_module=RosaLinear,
+            replacement_kwargs=dict(rank=rank)
         )
 
 
