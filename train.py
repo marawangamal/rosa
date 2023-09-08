@@ -19,7 +19,7 @@ from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker, preprocess_function
+    CudaMemoryTracker, preprocess_function, check_nan_in_model
 from eval import evaluate_model_bleu
 
 import peftnet as pn
@@ -148,9 +148,10 @@ def evaluate(model, device, eval_dataloader):
             }
 
 
-def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
-    # Mask gradients
-    # model = model.module.sample_trainable() if isinstance(model, nn.DataParallel) else model.sample_trainable()
+def refactorize(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
+    """Refactorize model and update optimizer and scheduler accordingly"""
+
+    # (Re)factorize model
     model = model.module.factorize() if isinstance(model, nn.DataParallel) else model.factorize()
 
     # New optimizer
@@ -219,9 +220,6 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
     # Get trainable parameters
     n_trainable_params = get_num_trainable_params(model)
 
-    # if args['train']['mark_only_rosa_or_lora_as_trainable'] and not args['fnmodel']['name'] == 'none':
-    #     mark_only_rosa_or_lora_as_trainable(model, verbose=False)
-
     for i_step, batch in enumerate(train_dataloader):
 
         batch = {k: v.to(device) for k, v in batch.items()}
@@ -232,7 +230,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
         if args['fnmodel']['name'] == 'rosa' and args['fnmodel']['params']['level'] == "batch":
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
 
-            model, optimizer, lr_scheduler = sample_trainable(
+            model, optimizer, lr_scheduler = refactorize(
                 args, model, lr_scheduler, optimizer, steps_counter, num_training_steps
             )
             cuda_memory_tracker.track("[train_epoch] After sample_trainable")
@@ -251,15 +249,19 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
             loss = outputs.loss.mean()
         else:
             loss = outputs.loss
-        latency_report.stop(name="loss.mean()")
 
-        loss.backward()
-        cuda_memory_tracker.track("[train_epoch] After loss.backward()")
-        latency_report.stop(name="loss.backward()")
+        if torch.isnan(loss):
+            raise ValueError("Loss is NAN. Discontinuing training.")
 
-        optimizer.step()
-        cuda_memory_tracker.track("[train_epoch] After optimizer.step()")
-        latency_report.stop(name="optimizer.step()")
+        else:
+            latency_report.stop(name="loss.mean()")
+            loss.backward()
+            cuda_memory_tracker.track("[train_epoch] After loss.backward()")
+            latency_report.stop(name="loss.backward()")
+
+            optimizer.step()
+            cuda_memory_tracker.track("[train_epoch] After optimizer.step()")
+            latency_report.stop(name="optimizer.step()")
 
         if lr_scheduler is not None:
             lr_scheduler.step()
@@ -285,7 +287,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
     if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
         df = model_fn.get_report()
-        logging.info(df)
+        logging.info("\n{}".format(df))
         logging.info(model_fn)
 
     if writer is not None:
@@ -325,10 +327,11 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         epoch_start_time = time.time()
 
-        # Mask gradients of RosaNet
+        # Refactorize if using ROSA model
         if args['fnmodel']['name'] == "rosa" and args['fnmodel']['params']['level'] == "epoch":
+            logging.info("=> Re-sampling trainable parameters...")
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
-            cmodel, optimizer, lr_scheduler = sample_trainable(
+            cmodel, optimizer, lr_scheduler = refactorize(
                 args, cmodel, lr_scheduler, optimizer, steps_counter, num_training_steps
             )
 
@@ -533,6 +536,11 @@ def main(cfg: DictConfig):
         "rosa": pn.RosaNet, "lora": pn.LoraNet, "none": lambda x, **kwargs: x
     }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
     logging.info("Factorized Model:\n{}".format(cmodel))
+    model_fn = model.module if isinstance(model, nn.DataParallel) else model
+    if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
+        df = model_fn.get_report()
+        logging.info("\n{}".format(df))
+        logging.info(model_fn)
 
     cuda_memory_tracker.track('[main] Created factorized model loaded to cpu')
 

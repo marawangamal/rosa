@@ -325,3 +325,11 @@ def preprocess_function_old(examples, tokenizer, dataset_name="eli5", max_length
         return output
     else:
         raise NotImplementedError
+
+
+def check_nan_in_model(model):
+    for name, param in model.named_parameters():
+        if torch.isnan(param).any():
+            print("Found nan in {}".format(name))
+            return True
+    return False

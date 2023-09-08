@@ -43,6 +43,11 @@ class PEFTNet(nn.Module):
         self.replacement_module = replacement_module
         self.factorize_map = {f: replacement_module for f in self.factorize_list}
         self.replacement_kwargs = replacement_kwargs if replacement_kwargs is not None else dict()
+
+        # Make modules non-trainable
+        for param in model.parameters():
+            param.requires_grad = False
+
         self.peft_model = model
         self.apply_peft()
 
@@ -87,7 +92,7 @@ class PEFTNet(nn.Module):
         for name, layer in self.peft_model.named_modules():
             params_dict = self.get_num_params(layer)
 
-            df.at[name, 'new name'] = name
+            df.at[name, 'name'] = name
             df.at[name, 'type'] = type(layer).__name__
             df.at[name, '# train'] = params_dict['trainable']
             df.at[name, '# fixed'] = params_dict['fixed']
@@ -95,7 +100,7 @@ class PEFTNet(nn.Module):
             df.at[name, '% train'] = round(safe_div(params_dict['trainable'], params_dict['total']) * 100, 2)
 
         # Set the 'name' column as the index
-        df.set_index('new name', inplace=True)
+        df.set_index('name', inplace=True)
 
         # Return string
         return df.to_string()
