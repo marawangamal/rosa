@@ -12,7 +12,7 @@ class PeftLinear(nn.Module):
             rank: Union[int, float] = 1.0,
             bias: bool = False
     ):
-        """ROSA PEFT linear layer with trainable and fixed parameters
+        """ PEFT linear layer with trainable and fixed parameters in parallel.
 
         Args:
             in_features: number of input features
