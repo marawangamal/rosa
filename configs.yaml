@@ -6,7 +6,7 @@ train:
   batch_size: 10
   fraction: 1.0 # ratio of the training set to use
   seq_len: 512
-  mark_only_rosa_or_lora_as_trainable: True
+  ignore_list: True # ignore list of words
   optimizer:
     name: adamw # adam, adamw sgd
     params:

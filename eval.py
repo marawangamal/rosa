@@ -52,23 +52,28 @@ def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, to
         eos_token_id=tokenizer.eos_token_id,
     )
     logging.info("=> Testing model bleu scores (Device={}) ...".format(predictor.device))
+    num_mrs = 0
     with open(output_path_refs, "w", newline="") as f:
+        writer = csv.writer(f)
         current_mr = ""
+
         for i, datapoint in enumerate(tqdm(test_dataset, total=len(test_dataset))):
             if datapoint['meaning_representation'] != current_mr:
                 if i != 0:
                     f.write("\n")
+                    num_mrs += 1
                 current_mr = datapoint['meaning_representation']
-            hr_with_spaces = datapoint['human_reference'].translate(
-                str.maketrans({key: " {0} ".format(key) for key in string.punctuation}))
-            f.write(hr_with_spaces + "\n")
+            writer.writerow([datapoint['human_reference']])
+        num_mrs += 1
 
+    num_preds = 0
     with open(output_path_preds, "w", newline="") as f:
         writer = csv.writer(f)
         current_mr = ""
 
         for datapoint in tqdm(test_dataset, total=len(test_dataset)):
             if datapoint['meaning_representation'] != current_mr:
+                num_preds += 1
                 current_mr = datapoint['meaning_representation']
                 input_str = "Input: {} Output: ".format(current_mr)
 

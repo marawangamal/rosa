@@ -44,6 +44,16 @@ python compile.py path/to/saved/runs // compile results of all models
 with `path/to/saved/runs` being the root containing the saved runs of the model(s) in the paper.
 
 
+To evaluate test metrics for a single model, first clone run:
+
+```commandline
+export E2E_METRICS_EXEC=/path/to/e2e-metrics/measure_scores.py
+python eval.py -e /path/to/saved/experiment
+$E2E_METRICS_EXEC -p /path/to/references.txt path/to/predictions.txt
+```
+
+[//]: # ($E2E_METRICS_EXEC -p /home/mila/m/marawan.gamal/scrates/rosa/runs/e2e_nlg)
+
 ## Visualize train/validation curves of model(s)
 Run the following command to visualize the train/validation curves of model(s) in the paper:
 
