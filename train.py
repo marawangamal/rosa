@@ -1,7 +1,6 @@
 import os
 import os.path as osp
 import math
-import subprocess
 import time
 import logging
 import torch.nn as nn
@@ -177,16 +176,12 @@ def refactorize(args, model, lr_scheduler, optimizer, steps_counter, num_trainin
     return model, optimizer, lr_scheduler
 
 
-def mark_only_rosa_or_lora_as_trainable(model, verbose=False):
-    for name, param in model.named_parameters():
-        if ("rosa" in name and "fixed" not in name) or "lora" in name:
-            param.requires_grad = True
-            if verbose:
-                print("+ Marked {} as trainable".format(name))
-        else:
-            if verbose:
-                print("- Marked {} as not trainable".format(name))
-            param.requires_grad = False
+def get_ignore_list(model):
+    ignore_list = []
+    for name, layer in model.named_modules():
+        if 'mlp' in name:
+            ignore_list.append(name)
+    return ignore_list
 
 
 def get_num_trainable_params(model):
@@ -194,11 +189,6 @@ def get_num_trainable_params(model):
     for name, param in model.named_parameters():
         n_trainable_params += param.numel() if param.requires_grad else 0
     return n_trainable_params
-
-
-def printmodel(model):
-    for name, param in model.named_parameters():
-        print("Name: {} | Shape: {} | Requires grad: {}".format(name, param.shape, param.requires_grad))
 
 
 def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, epoch, print_freq=10,
@@ -532,9 +522,10 @@ def main(cfg: DictConfig):
 
     # Factorize model either using ROSA or LORA
     logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
+    ignore_list = get_ignore_list(model) if args['train']['ignore_list'] else None
     cmodel = {
         "rosa": pn.RosaNet, "lora": pn.LoraNet, "none": lambda x, **kwargs: x
-    }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
+    }[args['fnmodel']['name'].lower()](model, ignore_list=ignore_list, **args['fnmodel']['params'])
     logging.info("Factorized Model:\n{}".format(cmodel))
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
     if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
