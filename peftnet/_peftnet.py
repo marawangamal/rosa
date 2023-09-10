@@ -24,6 +24,7 @@ class PEFTNet(nn.Module):
             replacement_kwargs: kwargs for replacement module constructor
 
         Notes:
+            - only modules types in `factorize_list` will be factorized
             - `factorize_list` and `fan_in_fan_out_map` must be specified/unspecified simultaneously
 
 
