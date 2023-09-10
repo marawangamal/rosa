@@ -29,16 +29,23 @@ class PeftLinear(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.rank = self._integer_rank(rank, full_rank=min(in_features, out_features))
-        self.bias = nn.Parameter(torch.zeros(out_features, 1)) if bias else None
+        self.bias = nn.Parameter(torch.zeros(out_features)) if bias else None
         self.a = nn.Parameter(torch.zeros(in_features, self.rank))
         self.b = nn.Parameter(torch.randn(self.rank, out_features))
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
-        self.merged = False
+        # self.merged = False
+        self.register_buffer('merged', torch.tensor([False]))
 
-    def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None):
+    def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
+                           bias_init: torch.Tensor = None):
+        """Initialize weights and biases with given tensors."""
         self.a.data = a_init if a_init is not None else self.a.data
         self.b.data = b_init if b_init is not None else self.b.data
         self.w.data = w_init if w_init is not None else self.w.data
+
+        if bias_init is not None:
+            assert self.bias.data.shape == bias_init.shape, "Bias shape mismatch"
+            self.bias.data = bias_init
 
     @classmethod
     def from_module(cls, linear_layer: nn.Module, rank=1.0, fan_in_fan_out=True) -> nn.Module:
@@ -54,12 +61,12 @@ class PeftLinear(nn.Module):
         )
         a = torch.zeros(obj.in_features, obj.rank, device=w.device)
         b = torch.randn(obj.rank, obj.out_features, device=w.device)
-        obj.initialize_weights(w_init=w, a_init=a, b_init=b)
+        obj.initialize_weights(w_init=w, a_init=a, b_init=b, bias_init=bias)
         return obj
 
     def merge(self):
         """Merge `a` and `b` with `w` and make `w` trainable"""
-        if not self.merged:
+        if not self.merged.item():
             # Merge w and ab
             self.w.data = self.a.data @ self.b.data + self.w.data
 
@@ -70,7 +77,7 @@ class PeftLinear(nn.Module):
             self.w.requires_grad = True
 
             # Toggle merged flag
-            self.merged = True
+            self.merged = torch.tensor([True])
         return self
 
     def factorize(self):
@@ -79,13 +86,10 @@ class PeftLinear(nn.Module):
             self.merge()
 
         # Factorize
-        try:
-            u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
-            a = s.reshape(1, -1) * u
-            b = vt
-            w_hat = a @ b
-        except:
-            import pdb; pdb.set_trace()
+        u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
+        a = s.reshape(1, -1) * u
+        b = vt
+        w_hat = a @ b
 
         # Check reconstruction error
         assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
@@ -111,7 +115,7 @@ class PeftLinear(nn.Module):
         self.w.requires_grad = False
 
         # Toggle merged flag
-        self.merged = False
+        self.merged = torch.tensor([False])
         return self
 
     def __repr__(self):
@@ -126,24 +130,30 @@ class PeftLinear(nn.Module):
 
     @staticmethod
     def _integer_rank(rank, full_rank):
-        """ Convert a ratio to an integer"""
+        """Convert a ratio to an integer"""
         return rank if rank > 1 else max(int(rank * full_rank), 1)
 
-    def _select_k_from_n(self, k: int, n: int, mode: str = 'random'):
-        """Choose k indices from n indices"""
+    @staticmethod
+    def _select_k_from_n(k: int, n: int, mode: str = 'random'):
+        """Choose `k` indices from `n` indices"""
 
         assert 0 < k <= n, "k must be an integer between 0 and n"
         assert isinstance(k, int) and isinstance(n, int), "k and n must be integers"
 
         if mode.lower() == 'random':
+            # Select k random indices from n indices
             start_idx = torch.randint(0, n - k, (1,)).item()
             end_idx = start_idx + k
             chosen_ids = torch.arange(start_idx, end_idx)
             remaining_ids = [i for i in range(n) if i not in chosen_ids]
         elif mode.lower() == 'top':
-            raise NotImplementedError
+            # Select top k indices from n indices
+            chosen_ids = torch.arange(0, min(k, n - k))
+            remaining_ids = [i for i in range(n) if i not in chosen_ids]
         elif mode.lower() == 'bottom':
-            raise NotImplementedError
+            # Select bottom k indices from n indices
+            chosen_ids = torch.arange(max(0, n - k), n)
+            remaining_ids = [i for i in range(n) if i not in chosen_ids]
         else:
             raise AttributeError(f"Unknown mode: {mode}. Mode must be one of ['random', 'top', 'bottom']")
 
@@ -153,16 +163,16 @@ class PeftLinear(nn.Module):
         """ Forward pass.
 
         Args:
-            x: x: [*, in_features]
+            x: [*, in_features]
 
         Returns:
             y: [*, out_features]
         """
 
-        if self.merged and self.training:
+        if self.merged.item() and self.training:
             raise RuntimeError("Cannot call forward on a merged layer in training mode. ")
 
-        if self.merged:
+        if self.merged.item():
             # [*, in_features] @ [in_features, out_features] + [out_features, 1] = [*, out_features]
             return x @ self.w + self.bias.reshape(-1) if self.bias is not None else x @ self.w
         else:
