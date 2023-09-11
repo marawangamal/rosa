@@ -131,7 +131,7 @@ class PeftLinear(nn.Module):
     @staticmethod
     def _integer_rank(rank, full_rank):
         """Convert a ratio to an integer"""
-        return rank if rank > 1 else max(int(rank * full_rank), 1)
+        return rank if isinstance(rank, int) else max(int(rank * full_rank), 1)
 
     @staticmethod
     def _select_k_from_n(k: int, n: int, mode: str = 'random'):
