@@ -18,7 +18,7 @@ from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker, preprocess_function, check_nan_in_model
+    CudaMemoryTracker, preprocess_function, get_ignore_list
 from eval import evaluate_model_bleu
 
 import peftnet as pn
@@ -174,14 +174,6 @@ def refactorize(args, model, lr_scheduler, optimizer, steps_counter, num_trainin
             lr_scheduler.step()
 
     return model, optimizer, lr_scheduler
-
-
-def get_ignore_list(model):
-    ignore_list = []
-    for name, layer in model.named_modules():
-        if 'mlp' in name:
-            ignore_list.append(name)
-    return ignore_list
 
 
 def get_num_trainable_params(model):
@@ -350,6 +342,9 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             if test_dataset is not None else None
         test_metrics = evaluate(cmodel, device, test_dataloader) if test_dataloader is not None else None
 
+        # Combine test metrics
+        test_metrics = {**test_metrics, **test_metrics_advanced}
+
         # Log metrics
         logging.info(
             "=> Epoch {:4d}/{:4d} | Elapsed: tr={:5.2f}s tot={:5.2f}s | ".format(
@@ -358,8 +353,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             )
             + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | "
             + " | ".join([f"Valid {k}: {v:.2f}" for k, v in valid_metrics.items()]) + " | "
-            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics.items()]) + " | "
-            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics_advanced.items()])
+            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics.items()])
         )
         logging.info(cuda_memory_tracker.report())
 
@@ -382,8 +376,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         }
 
         # Save model checkpoint
-        if best_valid_metrics is None or valid_metrics['loss'] < best_valid_metrics['loss']:
-            best_valid_metrics = valid_metrics
+        if best_valid_metrics is None or test_metrics['bleu'] > best_valid_metrics['bleu']:
+            best_valid_metrics = test_metrics
             torch.save(ckpt, osp.join(output_path, "model_best.pth"))
             torch.save(ckpt, osp.join(output_path, "model_latest.pth"))
             torch.save(ckpt, osp.join(output_path, "model_{}.pth".format(i_epoch)))
@@ -405,11 +399,6 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             for m in test_metrics.keys():
                 if m is not None:
                     writer.add_scalar("test/{}".format(m), test_metrics[m], i_epoch)
-
-        if test_metrics_advanced is not None:
-            for m in test_metrics_advanced.keys():
-                if m is not None:
-                    writer.add_scalar("test/{}".format(m), test_metrics_advanced[m], i_epoch)
 
         writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], i_epoch)
 
@@ -566,7 +555,7 @@ def main(cfg: DictConfig):
 
         optimizer.load_state_dict(dct_latest['optimizer_state_dict'])
         curr_epoch = dct_latest['epoch']
-        curr_best_valid_metrics = dct_best['valid_metrics']
+        curr_best_valid_metrics = dct_best['test_metrics']
         logging.info("=> Resuming training from from epoch {}".format(dct_latest['epoch']))
 
     else:

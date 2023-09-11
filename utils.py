@@ -333,3 +333,11 @@ def check_nan_in_model(model):
             print("Found nan in {}".format(name))
             return True
     return False
+
+
+def get_ignore_list(model):
+    ignore_list = []
+    for name, layer in model.named_modules():
+        if 'mlp' in name:
+            ignore_list.append(name)
+    return ignore_list

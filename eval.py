@@ -22,7 +22,7 @@ from datasets import load_dataset
 from transformers.pipelines.pt_utils import KeyDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import evaluate
-from utils import load_object, AverageMeter
+from utils import load_object, AverageMeter, get_ignore_list
 from itertools import groupby
 
 
@@ -169,122 +169,6 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
         }
 
 
-def evaluate_model_bleu_datapoint(cmodel, test_dataset, tokenizer, device=None, batch_size=32):
-    BLEU = evaluate.load("bleu")
-    bleu_average_meter = AverageMeter()
-
-    # Initialize model
-    model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-    model_fn = model_fn.peft_model if (
-                isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) else model_fn
-
-    # Set the device
-    device = device if device is not None else torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model_fn.to(device)
-
-    # Create predictor
-    predictor = pipeline(
-        'text-generation',
-        model=model_fn,
-        tokenizer=tokenizer,
-        device=device,
-        pad_token_id=tokenizer.eos_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-    )
-    num_data_points = len(test_dataset)
-
-    for i in tqdm(range(0, num_data_points, batch_size)):
-        batch = test_dataset[i:i + batch_size]
-
-        input_strs = ["Input: {} Output: ".format(dp['meaning_representation']) for dp in batch]
-
-        # Generate batch outputs
-        output_strs = predictor(
-            input_strs,
-            return_full_text=False,
-            no_repeat_ngram_size=4,
-            num_beams=5,
-            max_length=512,
-        )
-
-        for idx, output in enumerate(output_strs):
-            references = [batch[idx]['human_reference']]
-            output_text = output['generated_text'].strip().replace("\xa0", " ")
-
-            # Compute BLEU
-            results = BLEU.compute(predictions=[output_text], references=[references])
-            bleu_score = results["bleu"]
-            bleu_average_meter.add(bleu_score)
-
-    return {
-        "bleu": bleu_average_meter.value,
-    }
-
-
-def evaluate_model_bleu_old(cmodel, test_dataset, tokenizer, device=None, batch_size=32):
-    with torch.no_grad():
-        BLEU = evaluate.load("bleu")
-        bleu_average_meter = AverageMeter()
-
-        # Initialize model
-        model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.peft_model if (
-                    isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) else model_fn
-        model_fn.eval()
-
-        predictor = pipeline(
-            'text-generation',
-            model=model_fn,
-            tokenizer=tokenizer,
-            device=device if device is not None else torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'),
-            pad_token_id=tokenizer.eos_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-        )
-
-
-        # Sort dataset by 'meaning_representation' to ensure all similar items are together
-        sorted_dataset = sorted(test_dataset, key=lambda x: x['meaning_representation'])
-
-        # Group the sorted dataset by 'meaning_representation'
-        grouped_data = [list(group) for key, group in groupby(sorted_dataset, key=lambda x: x['meaning_representation'])]
-
-        # Combine all references for each group
-        grouped_data = [
-            {
-                "meaning_representation": group[0]['meaning_representation'],
-                "human_reference": [item['human_reference'] for item in group]
-            }
-            for group in grouped_data
-        ]
-
-        num_pts = len(grouped_data)
-        for i in tqdm(range(0, num_pts, batch_size)):
-            batch = grouped_data[i:i + batch_size]
-
-            input_strs = ["Input: {} Output: ".format(dp['meaning_representation']) for dp in batch]
-            references = [item['human_reference'] for item in batch]
-
-            output_strs = predictor(
-                input_strs,
-                return_full_text=False,
-                no_repeat_ngram_size=4,
-                num_beams=5,
-                max_length=512,
-            )
-
-            output_strs = [
-                output[0]['generated_text'].strip().replace("\xa0", " ") for output in output_strs
-            ]
-
-            # Compute BLEU
-            bleu_score_sum = sum([BLEU.compute(predictions=[output_str], references=[reference])["bleu"] for output_str, reference in zip(output_strs, references)])
-            bleu_average_meter.add(bleu_score_sum, n=len(batch))
-
-        return {
-            "bleu": bleu_average_meter.value,
-        }
-
-
 # https://stackoverflow.com/questions/76465343/huggingface-transformers-model-config-reported-this-is-a-deprecated-strategy-to
 # @hydra.main(version_base=None, config_path="./", config_name="configs")
 def evaluate_experiment(experiment_root, test_dataset, overwrite=False, min_records=620, all=False):
@@ -319,9 +203,12 @@ def evaluate_experiment(experiment_root, test_dataset, overwrite=False, min_reco
         tokenizer.pad_token = tokenizer.eos_token
 
         # Factorize & Load pretrained model
+        ignore_list = get_ignore_list(model) if experiment_args['train']['ignore_list'] else None
         cmodel = {
             "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
-        }[experiment_args['fnmodel']['name'].lower()](model, **experiment_args['fnmodel']['params'])
+        }[experiment_args['fnmodel']['name'].lower()](
+            model, ignore_list=ignore_list, **experiment_args['fnmodel']['params']
+        )
 
         print("\t=> Loading model {} ...".format(model_name))
         print("\t=> Using device {}".format(device))

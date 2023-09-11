@@ -52,7 +52,7 @@ python eval.py -e /path/to/saved/experiment
 $E2E_METRICS_EXEC -p /path/to/references.txt path/to/predictions.txt
 ```
 
-[//]: # ($E2E_METRICS_EXEC -p /home/mila/m/marawan.gamal/scrates/rosa/runs/e2e_nlg)
+[//]: # (export E2E_METRICS_EXEC=/home/mila/m/marawan.gamal/projects/e2e-metrics/measure_scores.py)
 
 ## Visualize train/validation curves of model(s)
 Run the following command to visualize the train/validation curves of model(s) in the paper:
