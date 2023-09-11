@@ -22,6 +22,13 @@ common_preamble_runs:
   - cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
 
 groups:
+  - name: MET | E2E_NLG | GPT2-S LoRA (r=5) ROSA (r=1)
+    preamble:
+      - "#SBATCH --gres=gpu:2"
+    paralleljobs:
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-5 train.optimizer.name=adamw fnmodel.params.rank=1
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-5 train.optimizer.name=adamw fnmodel.params.rank=5
+
   - name: MET | E2E_NLG | GPT2-S HP Tuning
     preamble:
       - "#SBATCH --gres=gpu:2"
@@ -57,16 +64,16 @@ groups:
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-7 train.optimizer.name=adamw
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-6 train.optimizer.name=adamw
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-5 train.optimizer.name=adamw
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-4 train.optimizer.name=adamw
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-3 train.optimizer.name=adamw
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-2 train.optimizer.name=adamw
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 train.optimizer.name=adamw
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 train.optimizer.name=adamw
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-2 train.optimizer.name=adamw
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=5e-1 train.optimizer.name=adamw
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-7 train.optimizer.name=adamw
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-6 train.optimizer.name=adamw
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-5 train.optimizer.name=adamw
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-4 train.optimizer.name=adamw
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-3 train.optimizer.name=adamw
-#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-2 train.optimizer.name=adamw
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 train.optimizer.name=adamw
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 train.optimizer.name=adamw
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-2 train.optimizer.name=adamw
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=5e-1 train.optimizer.name=adamw
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=5e-7 train.optimizer.name=sgd fnmodel.params.rank=0.001
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=5e-6 train.optimizer.name=sgd fnmodel.params.rank=0.001
@@ -132,11 +139,13 @@ groups:
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.0500
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.params.sample_method=bottom fnmodel.name=rosa fnmodel.params.rank=0.1000
 
-#  - name: MET | E2E_NLG | LoRA vs. ROSA GPT2-M
-#    preamble:
-#      - "#SBATCH --gres=gpu:2"
-#      - export CUDA_VISIBLE_DEVICES=0,1
-#    paralleljobs:
+  - name: MET | E2E_NLG | LoRA vs. ROSA GPT2-M
+    preamble:
+      - "#SBATCH --gres=gpu:2"
+    paralleljobs:
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-medium fnmodel.name=none
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-medium fnmodel.name=lora
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-medium fnmodel.name=rosa
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-medium fnmodel.name=none
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-medium fnmodel.name=lora fnmodel.params.rank=0.003125
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface train.epochs=5 model.name=gpt2-medium fnmodel.name=lora fnmodel.params.rank=0.00625

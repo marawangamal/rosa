@@ -22,8 +22,11 @@ from datasets import load_dataset
 from transformers.pipelines.pt_utils import KeyDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import evaluate
+from pymteval import BLEUScore
 from utils import load_object, AverageMeter, get_ignore_list
 from itertools import groupby
+
+# todo: use e2e metrics BLEU
 
 
 def get_data(dataset_name, dataset_cache):
@@ -94,11 +97,13 @@ def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, to
                 writer.writerow([output_str])
 
 
-def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size=32):
+def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
+                        output_path_preds=None, output_path_refs=None):
     with torch.no_grad():
         logging.info("=> Testing model bleu scores (Device={}) ...".format(device))
         uuid_str = str(uuid.uuid1())
-        BLEU = evaluate.load("bleu", experiment_id=uuid_str, cache_dir="~/.cache/huggingface/evaluate/{}".format(uuid_str))
+        # BLEU = evaluate.load("bleu", experiment_id=uuid_str, cache_dir="~/.cache/huggingface/evaluate/{}".format(uuid_str))
+        BLEU = BLEUScore()
         bleu_average_meter = AverageMeter()
 
         # Initialize model
@@ -111,7 +116,7 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
         # Sort dataset by 'meaning_representation' to ensure all similar items are together
         sorted_dataset = sorted(test_dataset, key=lambda x: x['meaning_representation'])
 
-        # Group the sorted dataset by 'meaning_representation'
+        # Group the sorted dataset by `meaning_representation`
         grouped_data = [list(group) for key, group in groupby(sorted_dataset, key=lambda x: x['meaning_representation'])]
 
         # Combine all references for each group
@@ -156,16 +161,19 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
             ]
 
             # Compute BLEU
+            # for output_str, reference in zip(output_strs, references):
+            #     if len(output_str.strip()) == 0:
+            #         bleu_score = 0
+            #     else:
+            #         results = BLEU.compute(predictions=[output_str], references=[reference])
+            #         bleu_score = results["bleu"]
+            #     bleu_average_meter.add(bleu_score)
+
             for output_str, reference in zip(output_strs, references):
-                if len(output_str.strip()) == 0:
-                    bleu_score = 0
-                else:
-                    results = BLEU.compute(predictions=[output_str], references=[reference])
-                    bleu_score = results["bleu"]
-                bleu_average_meter.add(bleu_score)
+                BLEU.append(output_str, reference)
 
         return {
-            "bleu": bleu_average_meter.value,
+            "bleu": BLEU.score(),
         }
 
 

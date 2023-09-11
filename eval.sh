@@ -45,7 +45,7 @@ for folder in "$root"/*; do
     done
 
     # iterate over prediction_files suffixed with _epoch_0, _epoch_1, etc.
-    for prediction_file in "$folder"/test_predictions*.txt; do
+    for prediction_file in "$folder"/test_predictions_latest*.txt; do
       # Check if both files exist before running the evaluation
       if [ -f "$reference_file" ] && [ -f "$prediction_file" ]; then
         echo "Evaluating $prediction_file" >> $output_file
