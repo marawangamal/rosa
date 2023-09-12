@@ -123,17 +123,18 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
                 ]
 
                 # Append references to `output_path_refs`
-                with open(output_path_refs, "a") as f:
+                with open(output_path_refs, "a", encoding='utf-8') as f:
                     writer = csv.writer(f)
                     for refs in references:
                         try:
-                            writer.writerows([[ref] for ref in refs])
+                            rw = [[ref] for ref in refs]
+                            writer.writerows(rw)
                         except:
                             raise ValueError("References must be a list of strings. Got refs: {}".format(refs))
                         writer.writerow([])
                         num_mrs += 1
 
-                with open(output_path_preds, "a") as f:
+                with open(output_path_preds, "a", encoding='utf-8') as f:
                     writer = csv.writer(f)
                     for pred in output_strs:
                         writer.writerow([pred])

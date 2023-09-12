@@ -26,6 +26,7 @@ groups:
 #    preamble:
 #      - "#SBATCH --gres=gpu:2"
 #    paralleljobs:
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=5e-5
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3
 #      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-2
