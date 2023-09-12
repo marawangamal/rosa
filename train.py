@@ -19,7 +19,7 @@ from transformers import AutoModelForCausalLM
 
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function, get_ignore_list
-from eval import evaluate_model_bleu
+from eval import evaluate_model
 
 import peftnet as pn
 import pandas as pd
@@ -125,7 +125,7 @@ def group_texts(examples, block_size=128):
 
 
 def evaluate(model, device, eval_dataloader):
-
+    model.eval()
     with torch.no_grad():
         loss_average_meter = AverageMeter()
         ppl_average_meter = AverageMeter()
@@ -338,8 +338,14 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         # Test
         logging.info("=> Computing test metrics...")
-        test_metrics_advanced = evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=device) \
-            if test_dataset is not None else None
+        test_metrics_advanced = evaluate_model(
+            cmodel,
+            test_dataset=test_dataset,
+            tokenizer=tokenizer,
+            device=device,
+            output_path_refs=osp.join(output_path, "refs_{}.txt".format(i_epoch)),
+            output_path_preds=osp.join(output_path, "preds_{}.txt".format(i_epoch))
+        ) if test_dataset is not None else None
         test_metrics = evaluate(cmodel, device, test_dataloader) if test_dataloader is not None else None
 
         # Combine test metrics

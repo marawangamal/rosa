@@ -14,6 +14,7 @@ import csv
 import argparse
 from tqdm import tqdm
 import string
+import warnings
 
 import torch
 
@@ -21,12 +22,14 @@ import peftnet as fn
 from datasets import load_dataset
 from transformers.pipelines.pt_utils import KeyDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers.generation import GenerationConfig
 import evaluate
 from pymteval import BLEUScore
 from utils import load_object, AverageMeter, get_ignore_list
 from itertools import groupby
 
-# todo: use e2e metrics BLEU
+# todo: use e2e metrics BLEU [done]
+# todo: remove newline=''
 
 
 def get_data(dataset_name, dataset_cache):
@@ -41,70 +44,23 @@ def get_data(dataset_name, dataset_cache):
     return test_dataset
 
 
-def evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer, device=None):
-    # Evaluate model
-    model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-    model_fn = model_fn.peft_model if (isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) \
-        else model_fn
-    predictor = pipeline(
-        'text-generation',
-        model=model_fn,
-        tokenizer=tokenizer,
-        device=device if device is not None else torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'),
-        pad_token_id=tokenizer.eos_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-    )
-    logging.info("=> Testing model bleu scores (Device={}) ...".format(predictor.device))
+def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
+                        output_path_preds=None, output_path_refs=None, compute_bleu=True):
+    cmodel.eval()
+    # Overwrite output files
+    if os.path.exists(output_path_preds):
+        os.remove(output_path_preds)
+
+    if os.path.exists(output_path_refs):
+        os.remove(output_path_refs)
+
+    # Used to ensure that the number of predictions and references are equal
     num_mrs = 0
-    with open(output_path_refs, "w", newline="") as f:
-        writer = csv.writer(f)
-        current_mr = ""
-
-        for i, datapoint in enumerate(tqdm(test_dataset, total=len(test_dataset))):
-            if datapoint['meaning_representation'] != current_mr:
-                if i != 0:
-                    f.write("\n")
-                    num_mrs += 1
-                current_mr = datapoint['meaning_representation']
-            writer.writerow([datapoint['human_reference']])
-        num_mrs += 1
-
     num_preds = 0
-    with open(output_path_preds, "w", newline="") as f:
-        writer = csv.writer(f)
-        current_mr = ""
 
-        for datapoint in tqdm(test_dataset, total=len(test_dataset)):
-            if datapoint['meaning_representation'] != current_mr:
-                num_preds += 1
-                current_mr = datapoint['meaning_representation']
-                input_str = "Input: {} Output: ".format(current_mr)
-
-                output_str = predictor(
-                    input_str,
-                    return_full_text=False,
-                    # length_penalty=0.8,
-                    no_repeat_ngram_size=4,
-                    num_beams=5,
-                    max_length=512,
-                    # early_stopping=True,
-                )[0]['generated_text'].strip().replace("\xa0", " ")
-
-                if output_str == "":
-                    output_str = "NONE"
-
-                # Write to CSV
-                writer.writerow([output_str])
-
-
-def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
-                        output_path_preds=None, output_path_refs=None):
     with torch.no_grad():
         logging.info("=> Testing model bleu scores (Device={}) ...".format(device))
-        uuid_str = str(uuid.uuid1())
-        # BLEU = evaluate.load("bleu", experiment_id=uuid_str, cache_dir="~/.cache/huggingface/evaluate/{}".format(uuid_str))
         BLEU = BLEUScore()
-        bleu_average_meter = AverageMeter()
 
         # Initialize model
         cmodel.to(device)
@@ -112,6 +68,12 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
         model_fn = model_fn.peft_model if (
                     isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) else model_fn
         model_fn.eval()
+        gen_cfg = GenerationConfig(
+            no_repeat_ngram_size=4,
+            max_length=512,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id
+        )
 
         # Sort dataset by 'meaning_representation' to ensure all similar items are together
         sorted_dataset = sorted(test_dataset, key=lambda x: x['meaning_representation'])
@@ -129,51 +91,75 @@ def evaluate_model_bleu(cmodel, test_dataset, tokenizer, device=None, batch_size
         ]
 
         num_pts = len(grouped_data)
-        for i in tqdm(range(0, num_pts, batch_size)):
-            batch = grouped_data[i:i + batch_size]
 
-            input_strs = ["Input: {} Output: ".format(dp['meaning_representation']) for dp in batch]
-            references = [item['human_reference'] for item in batch]
+        # Start of block where warnings are suppressed
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
 
-            inputs = tokenizer(
-                input_strs,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                max_length=512,
-            )
+            for i in tqdm(range(0, num_pts, batch_size)):
+                batch = grouped_data[i:i + batch_size]
 
-            output_ids = model_fn.generate(
-                input_ids=inputs['input_ids'].to(device),
-                attention_mask=inputs['attention_mask'].to(device),
-                no_repeat_ngram_size=4,
-                num_beams=5,
-                max_length=512,
-                early_stopping=True,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id
-            )
+                input_strs = ["Input: {} Output: ".format(dp['meaning_representation']) for dp in batch]
+                references = [item['human_reference'] for item in batch]
 
-            output_strs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
-            output_strs = [
-                out.replace("Input: {} Output: ".format(dp['meaning_representation']), "").strip() for out, dp in
-                zip(output_strs, batch)
-            ]
+                inputs = tokenizer(
+                    input_strs,
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
+                    max_length=512,
+                )
 
-            # Compute BLEU
-            # for output_str, reference in zip(output_strs, references):
-            #     if len(output_str.strip()) == 0:
-            #         bleu_score = 0
-            #     else:
-            #         results = BLEU.compute(predictions=[output_str], references=[reference])
-            #         bleu_score = results["bleu"]
-            #     bleu_average_meter.add(bleu_score)
+                output_ids = model_fn.generate(
+                    input_ids=inputs['input_ids'].to(device),
+                    attention_mask=inputs['attention_mask'].to(device),
+                    generation_config=gen_cfg,
+                )
 
-            for output_str, reference in zip(output_strs, references):
-                BLEU.append(output_str, reference)
+                output_strs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+                output_strs = [
+                    out.replace("Input: {} Output: ".format(dp['meaning_representation']), "").strip() for out, dp in
+                    zip(output_strs, batch)
+                ]
+
+                # Append references to `output_path_refs`
+                with open(output_path_refs, "a") as f:
+                    writer = csv.writer(f)
+                    for refs in references:
+                        try:
+                            writer.writerows([[ref] for ref in refs])
+                        except:
+                            raise ValueError("References must be a list of strings. Got refs: {}".format(refs))
+                        writer.writerow([])
+                        num_mrs += 1
+
+                with open(output_path_preds, "a") as f:
+                    writer = csv.writer(f)
+                    for pred in output_strs:
+                        writer.writerow([pred])
+                        num_preds += 1
+
+                print("Number of MRs: {}".format(num_mrs))
+                print("Number of preds: {}".format(num_preds))
+                assert num_mrs == num_preds, "Number of predictions and references must be equal"
+
+                if compute_bleu:
+                    for output_str, reference in zip(output_strs, references):
+                        BLEU.append(output_str, reference)
+
+        # Remove last newline from `output_path_refs`
+        with open(output_path_refs, 'rb+') as f:
+            f.seek(0, os.SEEK_END)
+            pos = f.tell() - 1
+            while pos > 0 and f.read(1) != b"\n":
+                pos -= 1
+                f.seek(pos, os.SEEK_SET)
+            if pos > 0:
+                f.seek(pos, os.SEEK_SET)
+                f.truncate()
 
         return {
-            "bleu": BLEU.score(),
+            "bleu": BLEU.score() if compute_bleu else None,
         }
 
 
@@ -186,7 +172,7 @@ def evaluate_experiment(experiment_root, test_dataset, overwrite=False, min_reco
     if all:
         print("\t=> Evaluating all {} models".format(len(model_names)))
     else:
-        model_names = ["model_latest.pth"]
+        model_names = ["model_best.pth"]
         print("\t=> Evaluating latest model only".format(len(model_names)))
 
     for model_name in model_names:
@@ -227,7 +213,15 @@ def evaluate_experiment(experiment_root, test_dataset, overwrite=False, min_reco
         if experiment_args['dataset']['name'] != "e2e_nlg":
             raise NotImplementedError("Dataset {} not supported".format(experiment_args['dataset']['name']))
 
-        evaluate_model(cmodel, output_path_preds, output_path_refs, test_dataset, tokenizer, device)
+        evaluate_model(
+            cmodel,
+            test_dataset=test_dataset,
+            tokenizer=tokenizer,
+            device=device,
+            output_path_preds=output_path_preds,
+            output_path_refs=output_path_refs,
+            compute_bleu=False,
+        )
 
 
 def main(args):
