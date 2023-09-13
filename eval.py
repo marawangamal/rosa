@@ -140,8 +140,8 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
                         writer.writerow([pred])
                         num_preds += 1
 
-                print("Number of MRs: {}".format(num_mrs))
-                print("Number of preds: {}".format(num_preds))
+                # print("Number of MRs: {}".format(num_mrs))
+                # print("Number of preds: {}".format(num_preds))
                 assert num_mrs == num_preds, "Number of predictions and references must be equal"
 
                 if compute_bleu:

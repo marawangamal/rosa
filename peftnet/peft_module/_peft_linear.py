@@ -80,7 +80,7 @@ class PeftLinear(nn.Module):
             self.merged = torch.tensor([True])
         return self
 
-    def factorize(self):
+    def factorize(self, mode: str = 'random'):
         """Factorize `w` into `a` and `b` and make a portion of `a` and `b` trainable"""
         if not self.merged:
             self.merge()
@@ -95,7 +95,7 @@ class PeftLinear(nn.Module):
         assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
 
         rank_upper_bound = min(self.w.shape)
-        trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode='random')
+        trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=mode)
 
         # Set trainable and fixed parameters
         init_a_trainable = a[:, trainable_indices]  # [in_f, r']

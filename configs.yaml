@@ -2,29 +2,28 @@ runs: 1
 debug: True
 train:
   epochs: 5
-  lr: 5e-5  # 0.0002 for paper
+  lr: 5e-5
   batch_size: 10
   fraction: 1.0 # ratio of the training set to use
   seq_len: 512
-  ignore_list: True # ignore list of words
+  ignore_list: True # use predefined `ignore_list` consisting pf 'mlp'
   optimizer:
-    name: adamw # adam, adamw sgd
+    name: adamw # [adam, adamw, sgd]
     params:
       momentum: 0.9
       weight_decay: 0.01
   scheduler:
-    name: linear # linear, cosine, constant, none
+    name: linear # [linear, cosine, constant, none]
     params:
       num_warmup_steps: 500
 model:
   name: gpt2  # gpt2, gpt2-medium, gpt2-large, gpt2-xl
 fnmodel:
-  name: none # factorized, lora, none
+  name: none # [rosa, lora, none]
   params:
-    rank: 0.01  # rank of trainable parameters float in (0,1) or int
-    level: epoch  # for factorized only. "epoch", "batch"
-    sample_method: random  # for factorized only. "random", "bottom"
-    collapse_fixed: True # for factorized only. collapse fixed parameters
+    rank: 0.01  # rank of trainable parameters [float in (0,1) or int]
+    level: epoch  # ["epoch", "batch"]
+    factorize_mode: random  # ["random", "top", "bottom"]
 logging:
   print_freq: 100
   input_size: [8, 512]  # used to compute latency [batch_size, seq_len]

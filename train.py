@@ -29,6 +29,8 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 2000)
 pd.set_option('display.float_format', '{:.3f}'.format)
 
+# todo: model(**batch) to include attn mask
+# todo: divide by rank in model
 
 def get_dataloaders(args, tokenizer):
     # Load dataset
@@ -285,7 +287,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
 
 def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device, output_path,
-          tokenizer, writer, curr_epoch=1, best_valid_metrics=None, baseline_runtime_metrics=None,
+          tokenizer, writer, curr_epoch=0, best_valid_metrics=None, baseline_runtime_metrics=None,
           cuda_memory_tracker=None, test_dataloader=None, test_dataset=None):
 
     # Get runtime metrics
@@ -320,14 +322,17 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             cuda_memory_tracker.track("[train] After epoch level sample trainable")
 
         # Train
-        cuda_memory_tracker.track("[train] Before train epoch")
-        _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
-
-        train_metrics, optimizer = train_epoch(
-            args, cmodel, device, train_dataloader, optimizer, lr_scheduler, i_epoch,
-            print_freq=args["logging"]["print_freq"], writer=writer
-        )
-        train_end_time = time.time()
+        if i_epoch > 0:
+            cuda_memory_tracker.track("[train] Before train epoch")
+            _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
+            train_metrics, optimizer = train_epoch(
+                args, cmodel, device, train_dataloader, optimizer, lr_scheduler, i_epoch,
+                print_freq=args["logging"]["print_freq"], writer=writer
+            )
+            train_end_time = time.time()
+        else:
+            train_metrics = None
+            train_end_time = epoch_start_time
 
         cuda_memory_tracker.track("[train] After train epoch")
         _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
@@ -357,7 +362,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 i_epoch, args["train"]["epochs"], (train_end_time - epoch_start_time),
                 (valid_end_time - epoch_start_time)
             )
-            + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | "
+            + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | " if i_epoch > 0 else ""
             + " | ".join([f"Valid {k}: {v:.2f}" for k, v in valid_metrics.items()]) + " | "
             + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics.items()])
         )
@@ -393,13 +398,15 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             torch.save(ckpt, osp.join(output_path, "model_{}.pth".format(i_epoch)))
 
         # Log to tensorboard
-        for m in valid_metrics.keys():
-            if m is not None:
-                writer.add_scalar("valid/{}".format(m), valid_metrics[m], i_epoch)
+        if valid_metrics is not None:
+            for m in valid_metrics.keys():
+                if m is not None:
+                    writer.add_scalar("valid/{}".format(m), valid_metrics[m], i_epoch)
 
-        for m in train_metrics.keys():
-            if m is not None:
-                writer.add_scalar("train/{}".format(m), train_metrics[m], i_epoch)
+        if train_metrics is not None:
+            for m in train_metrics.keys():
+                if m is not None:
+                    writer.add_scalar("train/{}".format(m), train_metrics[m], i_epoch)
 
         if test_metrics is not None:
             for m in test_metrics.keys():
@@ -560,7 +567,7 @@ def main(cfg: DictConfig):
         cuda_memory_tracker.track('[main] Optimizer passed network parameters')
 
         optimizer.load_state_dict(dct_latest['optimizer_state_dict'])
-        curr_epoch = dct_latest['epoch']
+        curr_epoch = dct_latest['epoch'] + 1
         curr_best_valid_metrics = dct_best['test_metrics']
         logging.info("=> Resuming training from from epoch {}".format(dct_latest['epoch']))
 
@@ -607,7 +614,7 @@ def main(cfg: DictConfig):
     logging.info(cuda_memory_tracker.report())
     train(
         args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device,
-        output_path, tokenizer, writer, curr_epoch=curr_epoch + 1, best_valid_metrics=curr_best_valid_metrics,
+        output_path, tokenizer, writer, curr_epoch=curr_epoch, best_valid_metrics=curr_best_valid_metrics,
         baseline_runtime_metrics=baseline_runtime_metrics, cuda_memory_tracker=cuda_memory_tracker,
         test_dataloader=test_dataloader, test_dataset=test_dataset
     )

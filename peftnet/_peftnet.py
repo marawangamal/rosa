@@ -8,6 +8,7 @@ class PEFTNet(nn.Module):
             model: nn.Module,
             ignore_list: list = None,
             factorize_list: list = None,
+            factorize_mode: str = 'random',
             fan_in_fan_out_map: dict = None,
             replacement_module: nn.Module = None,
             replacement_kwargs: dict = None,
@@ -40,6 +41,7 @@ class PEFTNet(nn.Module):
         self.fan_in_fan_out_map = {
             "Conv1D": True, "Linear": False
         } if fan_in_fan_out_map is None else fan_in_fan_out_map
+        self.factorize_mode = factorize_mode
         self.ignore_list = list() if ignore_list is None else ignore_list
         self.replacement_module = replacement_module
         self.factorize_map = {f: replacement_module for f in self.factorize_list}
@@ -62,15 +64,15 @@ class PEFTNet(nn.Module):
         return self._replace(condition, replacement_function)
 
     def merge(self) -> 'PEFTNet':
-        """Apply a merge on peft modules"""
+        """Apply `merge` on peft modules"""
         condition = lambda lyr, name: isinstance(lyr, self.replacement_module)
         replacement_function = lambda lyr: lyr.merge()
         return self._replace(condition, replacement_function)
 
     def factorize(self) -> 'PEFTNet':
-        """Apply a factorize on peft modules. If a module is already factorized, it will be merged and re-factorized"""
+        """Apply `factorize` on peft modules. If a module is already factorized, it will be merged and re-factorized"""
         condition = lambda lyr, name: isinstance(lyr, self.replacement_module)
-        replacement_function = lambda lyr: lyr.factorize()
+        replacement_function = lambda lyr: lyr.factorize(mode=self.factorize_mode)
         return self._replace(condition, replacement_function)
 
     def _replace(self, condition: callable, replacement_function: callable) -> 'PEFTNet':
