@@ -2,7 +2,7 @@ from typing import Union
 
 import torch.nn as nn
 
-from peftnet.peft_module.lora_linear import LoraLinear
+from peftnet.peft_module.loralinear import LoraLinear
 from peftnet._peftnet import PEFTNet
 
 
@@ -11,6 +11,7 @@ class LoraNet(PEFTNet):
             self,
             model: nn.Module,
             rank: Union[int, float],
+            use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
             *args, **kwargs
@@ -33,5 +34,5 @@ class LoraNet(PEFTNet):
             ignore_list,
             factorize_list,
             replacement_module=LoraLinear,
-            replacement_kwargs=dict(rank=rank)
+            replacement_kwargs=dict(rank=rank, use_scale=use_scale),
         )

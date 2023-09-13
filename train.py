@@ -9,6 +9,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 import torch
+import wandb
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -24,13 +25,18 @@ from eval import evaluate_model
 import peftnet as pn
 import pandas as pd
 
+wandb.login()
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 2000)
 pd.set_option('display.float_format', '{:.3f}'.format)
 
-# todo: model(**batch) to include attn mask
-# todo: divide by rank in model
+# todo: model(**batch) to include attn mask [done]
+# todo: divide by rank in model [done]
+# todo: add ia3 model [done]
+# todo: add in_out for ia3
+# todo: change model api to do a `factorize` if train mode and a `merge` if eval mode
+
 
 def get_dataloaders(args, tokenizer):
     # Load dataset
@@ -133,7 +139,7 @@ def evaluate(model, device, eval_dataloader):
         ppl_average_meter = AverageMeter()
         for batch in eval_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(batch["input_ids"], labels=batch['labels'])
+            outputs = model(**batch)
 
             if len(outputs.loss.shape) > 0:
                 loss = outputs.loss.mean()
@@ -225,7 +231,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
         # Forward pass
         # import pdb; pdb.set_trace()
-        outputs = model(batch["input_ids"], labels=batch['labels'])
+        outputs = model(**batch)
         cuda_memory_tracker.track("[train_epoch] After forward")
         latency_report.stop(name="forward")
 
@@ -402,18 +408,22 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             for m in valid_metrics.keys():
                 if m is not None:
                     writer.add_scalar("valid/{}".format(m), valid_metrics[m], i_epoch)
+                    wandb.log({"valid/{}".format(m): valid_metrics[m]}, step=i_epoch)
 
         if train_metrics is not None:
             for m in train_metrics.keys():
                 if m is not None:
                     writer.add_scalar("train/{}".format(m), train_metrics[m], i_epoch)
+                    wandb.log({"train/{}".format(m): train_metrics[m]}, step=i_epoch)
 
         if test_metrics is not None:
             for m in test_metrics.keys():
                 if m is not None:
                     writer.add_scalar("test/{}".format(m), test_metrics[m], i_epoch)
+                    wandb.log({"test/{}".format(m): test_metrics[m]}, step=i_epoch)
 
         writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], i_epoch)
+        wandb.log({"train/lr": optimizer.param_groups[0]['lr']}, step=i_epoch)
 
         # Get trainable parameters
         n_trainable_params = 0
@@ -434,8 +444,12 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.peft_model if isinstance(model_fn, pn.RosaNet) else model_fn
-        model_fn = model_fn.peft_model if isinstance(model_fn, pn.LoraNet) else model_fn
+
+        if any([isinstance(model_fn, k) for k in [pn.RosaNet, pn.LoraNet, pn.IA3Net]]):
+            model_fn = model_fn.peft_model
+        else:
+            model_fn = model_fn
+
         outputs = model_fn.generate(
             inputs,
             max_length=args['train']['seq_len'],
@@ -496,130 +510,142 @@ def main(cfg: DictConfig):
         )
         logging.getLogger().addHandler(logging.FileHandler(osp.join(output_path, "logging.txt")))
 
-    cuda_memory_tracker = CudaMemoryTracker()
-    cuda_memory_tracker.track('[main] Initial')
+        run = wandb.init(
+            mode="disabled",
+            # Set the project where this run will be logged
+            project="rosa",
+            name=folder_name,
+            # Track hyperparameters and run metadata
+            config=args,
+        )
 
-    model = AutoModelForCausalLM.from_pretrained(args['model']['name'])
-    tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
-    tokenizer.pad_token = tokenizer.eos_token
-    # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
-    train_dataloader, valid_dataloader, test_dataloader, test_dataset = get_dataloaders(args, tokenizer)
-    logging.info("Model:\n{}".format(model))
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    cuda_memory_tracker.track('[main] Created base model loaded to cpu')
+        cuda_memory_tracker = CudaMemoryTracker()
+        cuda_memory_tracker.track('[main] Initial')
 
-    logging.info("=> Computing baseline latency...")
-    model.to(device)
-    torch.cuda.empty_cache()
-    cuda_memory_tracker.track('[main] Moved baseline model loaded to gpu')
+        model = AutoModelForCausalLM.from_pretrained(args['model']['name'])
+        tokenizer = AutoTokenizer.from_pretrained(args['model']['name'])
+        tokenizer.pad_token = tokenizer.eos_token
+        # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
+        train_dataloader, valid_dataloader, test_dataloader, test_dataset = get_dataloaders(args, tokenizer)
+        logging.info("Model:\n{}".format(model))
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        cuda_memory_tracker.track('[main] Created base model loaded to cpu')
 
-    baseline_mean, baseline_std = get_latency(
-        model, device=device, inp=torch.ones(args['logging']['input_size'], dtype=torch.long)
-    ) if not args['debug'] else (1, 1)
-    baseline_params = get_num_params(model)
-
-    baseline_runtime_metrics = {
-        "mean": baseline_mean, "std": baseline_std, "params": baseline_params
-    }
-
-    # Factorize model either using ROSA or LORA
-    logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
-    ignore_list = get_ignore_list(model) if args['train']['ignore_list'] else None
-    cmodel = {
-        "rosa": pn.RosaNet, "lora": pn.LoraNet, "none": lambda x, **kwargs: x
-    }[args['fnmodel']['name'].lower()](model, ignore_list=ignore_list, **args['fnmodel']['params'])
-    logging.info("Factorized Model:\n{}".format(cmodel))
-    model_fn = model.module if isinstance(model, nn.DataParallel) else model
-    if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
-        df = model_fn.get_report()
-        logging.info("\n{}".format(df))
-        logging.info(model_fn)
-
-    cuda_memory_tracker.track('[main] Created factorized model loaded to cpu')
-
-    opt = {
-        "adamw": torch.optim.AdamW, "adam": torch.optim.Adam, "sgd": torch.optim.SGD
-    }[args['train']['optimizer']['name']]
-
-    cuda_memory_tracker.track('[main] Created optimizer on cpu')
-
-    # Resume training
-    if dct_latest is not None:
-        cmodel.load_state_dict(dct_latest['model_state_dict'])
-        cmodel.to(device)
-
+        logging.info("=> Computing baseline latency...")
+        model.to(device)
         torch.cuda.empty_cache()
-        cuda_memory_tracker.track('[main] Moved factorized model loaded to gpu')
+        cuda_memory_tracker.track('[main] Moved baseline model loaded to gpu')
 
-        if args['train']['optimizer']['name'] == "sgd":
-            optimizer = opt(
-                cmodel.parameters(),
-                lr=args["train"]["lr"],
-                **args['train']['optimizer']['params']
-            )
-        # Catch all exceptions
+        baseline_mean, baseline_std = get_latency(
+            model, device=device, inp=torch.ones(args['logging']['input_size'], dtype=torch.long)
+        ) if not args['debug'] else (1, 1)
+        baseline_params = get_num_params(model)
+
+        baseline_runtime_metrics = {
+            "mean": baseline_mean, "std": baseline_std, "params": baseline_params
+        }
+
+        # Factorize model either using ROSA or LORA
+        logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
+        ignore_list = get_ignore_list(model) if args['train']['ignore_list'] else None
+        cmodel = {
+            "rosa": pn.RosaNet,
+            "lora": pn.LoraNet,
+            "ia3": pn.IA3Net,
+            "none": lambda x, **kwargs: x
+        }[args['fnmodel']['name'].lower()](model, ignore_list=ignore_list, **args['fnmodel']['params'])
+        logging.info("Factorized Model:\n{}".format(cmodel))
+        model_fn = model.module if isinstance(model, nn.DataParallel) else model
+        if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
+            df = model_fn.get_report()
+            logging.info("\n{}".format(df))
+            logging.info(model_fn)
+
+        cuda_memory_tracker.track('[main] Created factorized model loaded to cpu')
+
+        opt = {
+            "adamw": torch.optim.AdamW, "adam": torch.optim.Adam, "sgd": torch.optim.SGD
+        }[args['train']['optimizer']['name']]
+
+        cuda_memory_tracker.track('[main] Created optimizer on cpu')
+
+        # Resume training
+        if dct_latest is not None:
+            cmodel.load_state_dict(dct_latest['model_state_dict'])
+            cmodel.to(device)
+
+            torch.cuda.empty_cache()
+            cuda_memory_tracker.track('[main] Moved factorized model loaded to gpu')
+
+            if args['train']['optimizer']['name'] == "sgd":
+                optimizer = opt(
+                    cmodel.parameters(),
+                    lr=args["train"]["lr"],
+                    **args['train']['optimizer']['params']
+                )
+            # Catch all exceptions
+            else:
+                optimizer = opt(
+                    cmodel.parameters(),
+                    lr=args["train"]["lr"]
+                )
+
+            cuda_memory_tracker.track('[main] Optimizer passed network parameters')
+
+            optimizer.load_state_dict(dct_latest['optimizer_state_dict'])
+            curr_epoch = dct_latest['epoch'] + 1
+            curr_best_valid_metrics = dct_best['test_metrics']
+            logging.info("=> Resuming training from from epoch {}".format(dct_latest['epoch']))
+
         else:
+            curr_epoch = 0
+            curr_best_valid_metrics = None
+            cmodel.to(device)
+            torch.cuda.empty_cache()
+            cuda_memory_tracker.track('[main] Moved factorized model loaded to gpu')
+
             optimizer = opt(
                 cmodel.parameters(),
                 lr=args["train"]["lr"]
             )
+            cuda_memory_tracker.track('[main] Optimizer passed network parameters')
+            logging.info("=> Starting training from scratch ...")
 
-        cuda_memory_tracker.track('[main] Optimizer passed network parameters')
+        # Scheduler
+        n_training_steps = args['train']['epochs'] * len(train_dataloader)
+        lr_scheduler = get_scheduler(
+            name=args['train']['scheduler']['name'],
+            optimizer=optimizer,
+            num_training_steps=n_training_steps,
+            **args['train']['scheduler']['params']
+        ) if args['train']['scheduler']['name'] != "none" else None
 
-        optimizer.load_state_dict(dct_latest['optimizer_state_dict'])
-        curr_epoch = dct_latest['epoch'] + 1
-        curr_best_valid_metrics = dct_best['test_metrics']
-        logging.info("=> Resuming training from from epoch {}".format(dct_latest['epoch']))
+        # Compute tn model latency
+        logging.info("=> Computing factorized latency...")
+        factorized_mean, factorized_std = get_latency(
+            cmodel, device=device, inp=torch.ones(args['logging']['input_size'], dtype=torch.long)
+        ) if not args['debug'] else (1, 1)
+        factorized_params = get_num_params(cmodel)
 
-    else:
-        curr_epoch = 0
-        curr_best_valid_metrics = None
-        cmodel.to(device)
-        torch.cuda.empty_cache()
-        cuda_memory_tracker.track('[main] Moved factorized model loaded to gpu')
+        logging.info("=> Baseline {:.4f} ms| Factorized {:.4f} ms | Speedup {:.4f} | Compression {:.4f}".format(
+            baseline_mean, factorized_mean, baseline_mean / factorized_mean, factorized_params / baseline_params
+        ))
 
-        optimizer = opt(
-            cmodel.parameters(),
-            lr=args["train"]["lr"]
+        # Parallelize the model
+        if torch.cuda.device_count() >= 1:
+            logging.info("=> Using {} GPU(s)".format(torch.cuda.device_count()))
+            cmodel = nn.DataParallel(cmodel)
+
+        # Training
+        logging.info(cuda_memory_tracker.report())
+        train(
+            args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device,
+            output_path, tokenizer, writer, curr_epoch=curr_epoch, best_valid_metrics=curr_best_valid_metrics,
+            baseline_runtime_metrics=baseline_runtime_metrics, cuda_memory_tracker=cuda_memory_tracker,
+            test_dataloader=test_dataloader, test_dataset=test_dataset
         )
-        cuda_memory_tracker.track('[main] Optimizer passed network parameters')
-        logging.info("=> Starting training from scratch ...")
 
-    # Scheduler
-    n_training_steps = args['train']['epochs'] * len(train_dataloader)
-    lr_scheduler = get_scheduler(
-        name=args['train']['scheduler']['name'],
-        optimizer=optimizer,
-        num_training_steps=n_training_steps,
-        **args['train']['scheduler']['params']
-    ) if args['train']['scheduler']['name'] != "none" else None
-
-    # Compute tn model latency
-    logging.info("=> Computing factorized latency...")
-    factorized_mean, factorized_std = get_latency(
-        cmodel, device=device, inp=torch.ones(args['logging']['input_size'], dtype=torch.long)
-    ) if not args['debug'] else (1, 1)
-    factorized_params = get_num_params(cmodel)
-
-    logging.info("=> Baseline {:.4f} ms| Factorized {:.4f} ms | Speedup {:.4f} | Compression {:.4f}".format(
-        baseline_mean, factorized_mean, baseline_mean / factorized_mean, factorized_params / baseline_params
-    ))
-
-    # Parallelize the model
-    if torch.cuda.device_count() >= 1:
-        logging.info("=> Using {} GPU(s)".format(torch.cuda.device_count()))
-        cmodel = nn.DataParallel(cmodel)
-
-    # Training
-    logging.info(cuda_memory_tracker.report())
-    train(
-        args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device,
-        output_path, tokenizer, writer, curr_epoch=curr_epoch, best_valid_metrics=curr_best_valid_metrics,
-        baseline_runtime_metrics=baseline_runtime_metrics, cuda_memory_tracker=cuda_memory_tracker,
-        test_dataloader=test_dataloader, test_dataset=test_dataset
-    )
-
-    print("=> Experiment: `{}` Succeeded".format(folder_name))
+        print("=> Experiment: `{}` Succeeded".format(folder_name))
 
 
 if __name__ == '__main__':

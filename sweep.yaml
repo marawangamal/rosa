@@ -1,0 +1,138 @@
+program: train.py
+method: bayes
+metric:
+  goal: maximize
+  name: test/bleu
+
+project: rosa-hp-tune
+
+parameters:
+  train.optimizer.name:
+    values: [sgd, adamw]
+  train.batch_size:
+    max: 32
+    min: 4
+  train.lr:
+    max: 0.1
+    min: 0.0000001
+    distribution: uniform
+  fnmodel.name:
+    value: lora
+#  fnmodel.params.factorize_mode:
+#    values: [random, top, bottom]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+
+#parameters:
+#  logging.memory_info:
+#    values:
+#      - "true"
+#      - "false"
+#    distribution: categorical
+#  logging.print_freq:
+#    max: 200
+#    min: 50
+#    distribution: int_uniform
+#  fnmodel.params.factorize_mode:
+#    values:
+#      - random
+#    distribution: categorical
+#  fnmodel.params.use_scale:
+#    values:
+#      - "true"
+#      - "false"
+#    distribution: categorical
+#  fnmodel.params.level:
+#    values:
+#      - epoch
+#    distribution: categorical
+#  fnmodel.params.rank:
+#    max: 6
+#    min: 2
+#    distribution: int_uniform
+#  fnmodel.name:
+#    values:
+#      - lora
+#    distribution: categorical
+#  dataset.cache:
+#    values:
+#      - /Tmp/slurm.3592097.0/huggingface
+#    distribution: categorical
+#  dataset.name:
+#    values:
+#      - e2e_nlg
+#    distribution: categorical
+#  output.path:
+#    values:
+#      - /home/mila/m/marawan.gamal/scratch/rosa/runs
+#    distribution: categorical
+#  train.ignore_list:
+#    values:
+#      - "true"
+#      - "false"
+#    distribution: categorical
+#  train.batch_size:
+#    max: 20
+#    min: 5
+#    distribution: int_uniform
+#  train.scheduler.params.num_warmup_steps:
+#    max: 1000
+#    min: 250
+#    distribution: int_uniform
+#  train.scheduler.name:
+#    values:
+#      - linear
+#    distribution: categorical
+#  train.optimizer.params.weight_decay:
+#    max: 0.02
+#    min: 0.005
+#    distribution: uniform
+#  train.optimizer.params.momentum:
+#    max: 1.8
+#    min: 0.45
+#    distribution: uniform
+#  train.optimizer.name:
+#    values:
+#      - adamw
+#    distribution: categorical
+#  train.fraction:
+#    max: 2
+#    min: 1
+#    distribution: int_uniform
+#  train.seq_len:
+#    max: 1024
+#    min: 256
+#    distribution: int_uniform
+#  train.epochs:
+#    max: 10
+#    min: 3
+#    distribution: int_uniform
+#  train.lr:
+#    max: 0.0004
+#    min: 0.000025
+#    distribution: uniform
+#  model.name:
+#    values:
+#      - gpt2
+#    distribution: categorical
+#  debug:
+#    values:
+#      - "true"
+#      - "false"
+#    distribution: categorical
+#  runs:
+#    max: 2
+#    min: 1
+#    distribution: int_uniform
+#  eval.experiment:
+#    values:
+#      - runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9_w0.01_nanone_nu100_namdistillgpt2_namelora_r0.1_leepoch_srandom_t0
+#    distribution: categorical
+#  eval.batch_size:
+#    max: 16
+#    min: 4
+#    distribution: int_uniform

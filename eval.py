@@ -6,30 +6,22 @@ python eval_lorank.py eval.experiment=runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9
 """
 import os
 import os.path as osp
-import uuid
 import logging
-import torch.nn as nn
-
 import csv
 import argparse
 from tqdm import tqdm
-import string
 import warnings
-
-import torch
-
-import peftnet as fn
-from datasets import load_dataset
-from transformers.pipelines.pt_utils import KeyDataset
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from transformers.generation import GenerationConfig
-import evaluate
-from pymteval import BLEUScore
-from utils import load_object, AverageMeter, get_ignore_list
 from itertools import groupby
 
-# todo: use e2e metrics BLEU [done]
-# todo: remove newline=''
+import torch
+import torch.nn as nn
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers.generation import GenerationConfig
+
+from pymteval import BLEUScore
+import peftnet as pn
+from utils import load_object, get_ignore_list
 
 
 def get_data(dataset_name, dataset_cache):
@@ -65,8 +57,11 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
         # Initialize model
         cmodel.to(device)
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.peft_model if (
-                    isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet)) else model_fn
+        if any([isinstance(model_fn, k) for k in [pn.RosaNet, pn.LoraNet, pn.IA3Net]]):
+            model_fn = model_fn.peft_model
+        else:
+            model_fn = model_fn
+
         model_fn.eval()
         gen_cfg = GenerationConfig(
             no_repeat_ngram_size=4,
@@ -200,7 +195,10 @@ def evaluate_experiment(experiment_root, test_dataset, overwrite=False, min_reco
         # Factorize & Load pretrained model
         ignore_list = get_ignore_list(model) if experiment_args['train']['ignore_list'] else None
         cmodel = {
-            "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
+            "rosa": pn.RosaNet,
+            "lora": pn.LoraNet,
+            "ia3": pn.IA3Net,
+            "none": lambda x, **kwargs: x
         }[experiment_args['fnmodel']['name'].lower()](
             model, ignore_list=ignore_list, **experiment_args['fnmodel']['params']
         )

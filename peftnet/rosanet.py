@@ -2,7 +2,7 @@ from typing import Union
 
 import torch.nn as nn
 
-from peftnet.peft_module.rosa_linear import RosaLinear
+from peftnet.peft_module.rosalinear import RosaLinear
 from peftnet._peftnet import PEFTNet
 
 
@@ -11,6 +11,7 @@ class RosaNet(PEFTNet):
             self,
             model: nn.Module,
             rank: Union[int, float],
+            use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
             *args, **kwargs
@@ -32,7 +33,7 @@ class RosaNet(PEFTNet):
             model, ignore_list,
             factorize_list,
             replacement_module=RosaLinear,
-            replacement_kwargs=dict(rank=rank)
+            replacement_kwargs=dict(rank=rank, use_scale=use_scale),
         )
 
         # ROSA Model initializes low rank matrices with values obtained from SVD

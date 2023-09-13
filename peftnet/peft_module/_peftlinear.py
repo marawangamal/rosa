@@ -10,6 +10,8 @@ class PeftLinear(nn.Module):
             in_features: int,
             out_features: int,
             rank: Union[int, float] = 1.0,
+            use_scale: bool = False,
+            alpha: float = 32,
             bias: bool = False
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
@@ -30,10 +32,11 @@ class PeftLinear(nn.Module):
         self.out_features = out_features
         self.rank = self._integer_rank(rank, full_rank=min(in_features, out_features))
         self.bias = nn.Parameter(torch.zeros(out_features)) if bias else None
+        self.use_scale = use_scale
+        self.alpha = alpha
         self.a = nn.Parameter(torch.zeros(in_features, self.rank))
         self.b = nn.Parameter(torch.randn(self.rank, out_features))
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
-        # self.merged = False
         self.register_buffer('merged', torch.tensor([False]))
 
     def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
@@ -48,7 +51,7 @@ class PeftLinear(nn.Module):
             self.bias.data = bias_init
 
     @classmethod
-    def from_module(cls, linear_layer: nn.Module, rank=1.0, fan_in_fan_out=True) -> nn.Module:
+    def from_module(cls, linear_layer: nn.Module, rank=1.0, fan_in_fan_out=True, *args, **kwargs) -> nn.Module:
         """Initialize from a nn.Linear/Conv1D module"""
 
         w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f] if fan_in_fan_out
@@ -57,7 +60,7 @@ class PeftLinear(nn.Module):
 
         # Initialize
         obj = cls(
-            in_features=w.size(0), out_features=w.size(1), rank=rank, bias=bias is not None
+            in_features=w.size(0), out_features=w.size(1), rank=rank, bias=bias is not None, *args, **kwargs
         )
         a = torch.zeros(obj.in_features, obj.rank, device=w.device)
         b = torch.randn(obj.rank, obj.out_features, device=w.device)
@@ -68,7 +71,7 @@ class PeftLinear(nn.Module):
         """Merge `a` and `b` with `w` and make `w` trainable"""
         if not self.merged.item():
             # Merge w and ab
-            self.w.data = self.a.data @ self.b.data + self.w.data
+            self.w.data = (self.alpha/self.rank) * self.a.data @ self.b.data + self.w.data
 
             # todo: empty a and b tensors to save memory
             # Make a, b fixed and w trainable
@@ -122,9 +125,9 @@ class PeftLinear(nn.Module):
         cls = self.__class__.__name__
         return (f'{cls}('
                 f'rank={self.rank}, '
-                f'a={self.a.shape, self.a.requires_grad}, '
-                f'b={self.b.shape, self.b.requires_grad}, '
-                f'w={self.w.shape, self.w.requires_grad}, '
+                f'a={self.a.shape} grad={self.a.requires_grad} scale={self.use_scale}, alpha={self.alpha}, '
+                f'b={self.b.shape} grad={self.b.requires_grad}, '
+                f'w={self.w.shape} grad={self.w.requires_grad}, '
                 f'bias={(self.bias.shape, self.bias.requires_grad) if self.bias is not None else None}'
                 f')')
 
@@ -177,5 +180,6 @@ class PeftLinear(nn.Module):
             return x @ self.w + self.bias.reshape(-1) if self.bias is not None else x @ self.w
         else:
             # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
-            return x @ self.a @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
-                else x @ self.a @ self.b + x @ self.w
+            a = (self.alpha/self.rank) * self.a if self.use_scale else self.a
+            return x @ a @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
+                else x @ a @ self.b + x @ self.w

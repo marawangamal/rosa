@@ -1,5 +1,5 @@
 from typing import Union
-from ._peft_linear import PeftLinear
+from ._peftlinear import PeftLinear
 
 
 class LoraLinear(PeftLinear):
@@ -8,7 +8,8 @@ class LoraLinear(PeftLinear):
             in_features: int,
             out_features: int,
             rank: Union[int, float] = 1.0,
-            bias: bool = False
+            bias: bool = False,
+            *args, **kwargs
     ):
         """ LORA linear layer with trainable and fixed parameters in parallel.
 
@@ -27,5 +28,6 @@ class LoraLinear(PeftLinear):
             in_features=in_features,
             out_features=out_features,
             rank=rank,
-            bias=bias
+            bias=bias,
+            *args, **kwargs
         )
