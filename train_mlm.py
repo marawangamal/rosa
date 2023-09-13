@@ -13,8 +13,9 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from datasets import load_dataset, load_metric
-from transformers import DataCollatorWithPadding
+from datasets import load_dataset
+import evaluate as eval_lib
+from transformers import DataCollatorWithPadding, default_data_collator
 from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForSequenceClassification
 from transformers import AutoConfig
@@ -42,20 +43,6 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
 }
 
-task_to_split = {
-    "mnli": {
-        "train": "train",
-        "validation": "validation_matched",
-        "test": "validation_matched"
-    },
-    "stsb": {
-        "train": "train",
-        "validation": "validation",
-        "test": "validation"
-    },
-}
-
-
 def get_dataloaders(args, tokenizer):
     # Load dataset
     assert args['dataset']['name'] == 'glue', "Dataset not supported"
@@ -63,22 +50,19 @@ def get_dataloaders(args, tokenizer):
 
     train_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
-        split=task_to_split[args['dataset']['task_name']]['train'],
+        split='train',
         cache_dir=args['dataset']['cache']
     )
     test_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
-        split=task_to_split[args['dataset']['task_name']]['test'],
+        split='test',
         cache_dir=args['dataset']['cache']
     )
     valid_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
-        split=task_to_split[args['dataset']['task_name']]['validation'],
+        split='validation',
         cache_dir=args['dataset']['cache']
     )
-
-    # take a small subset of the training set for debugging purposes
-    # train_dataset = train_dataset.select(range(1000))
 
     # Filter for faster training (debug)
     num_train_pts, _ = train_dataset.shape
@@ -89,20 +73,20 @@ def get_dataloaders(args, tokenizer):
         lambda examples: preprocess_function_mlm(
             examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']
         ),
-        batched=True,
+        #batched=True,
         # num_proc=4,
     )
 
     valid_tokenized = valid_dataset.map(
         lambda examples: preprocess_function_mlm(
             examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']),
-        batched=True
+        #batched=True
     )
 
     test_tokenized = test_dataset.map(
         lambda examples: preprocess_function_mlm(
             examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']),
-        batched=True
+        #batched=True
     )
 
     # Only include tokenized ids
@@ -110,8 +94,8 @@ def get_dataloaders(args, tokenizer):
     valid_tokenized_reduced = valid_tokenized.remove_columns(valid_dataset.column_names)
     test_tokenized_reduced = test_tokenized.remove_columns(test_dataset.column_names)
 
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer, 
-                                            return_tensors="pt", padding=True, pad_to_multiple_of=8)
+    # use default data collator
+    data_collator = default_data_collator
 
     train_dataloader = DataLoader(
         train_tokenized_reduced, shuffle=True, batch_size=args['train']['batch_size'], collate_fn=data_collator,
@@ -130,12 +114,13 @@ def get_dataloaders(args, tokenizer):
 
 
 def evaluate(model, device, eval_dataloader, task="cola"):
-    glue_metric = load_metric('glue', task)
+    glue_metric = eval_lib.load('glue', task)
 
     model.eval()
 
     predictions = []
     references = []
+
 
     with torch.no_grad():
         for batch in eval_dataloader:
@@ -143,6 +128,8 @@ def evaluate(model, device, eval_dataloader, task="cola"):
             outputs = model(**batch)
             predictions.extend(torch.argmax(outputs.logits, dim=-1).tolist())
             references.extend(batch['labels'].tolist())
+
+    #import pdb; pdb.set_trace()
     
     return glue_metric.compute(predictions=predictions, references=references)
 
@@ -225,7 +212,10 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
         # Forward pass
         # import pdb; pdb.set_trace()  # todo: need to handle stsb regression task
-        outputs = model(batch["input_ids"], labels=batch["labels"])
+
+        # get outputs from model, passing in labels as well for loss
+        outputs = model(**batch)
+        
         cuda_memory_tracker.track("[train_epoch] After forward")
         latency_report.stop(name="forward")
 
@@ -377,7 +367,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         elif args['dataset']['task_name'] == 'stsb':
             metric_key = 'spearmanr'
 
-        if best_valid_metrics is None or valid_metrics[metric_key] < best_valid_metrics[metric_key]:
+        if best_valid_metrics is None or valid_metrics[metric_key] > best_valid_metrics[metric_key]:
             best_valid_metrics = valid_metrics
             torch.save(ckpt, osp.join(output_path, "model_best.pth"))
             torch.save(ckpt, osp.join(output_path, "model_latest.pth"))
@@ -435,7 +425,7 @@ def main(cfg: DictConfig):
 
         dct_latest, dct_best = None, None
 
-        output_path = osp.join(args['output']['path'], args['dataset']['name'], folder_name)
+        output_path = osp.join(args['output']['path'], args['dataset']['name'], args['dataset']['task_name'], folder_name)
         if not osp.exists(output_path):
             os.makedirs(output_path)
             save_object(args, osp.join(output_path, 'args.pkl'))
@@ -564,17 +554,23 @@ def main(cfg: DictConfig):
 
         optimizer = opt(
             cmodel.parameters(),
-            lr=args["train"]["lr"]
+            lr=args["train"]["lr"],
+            **args['train']['optimizer']['params']
         )
         cuda_memory_tracker.track('[main] Optimizer passed network parameters')
         logging.info("=> Starting training from scratch ...")
 
     # Scheduler
     n_training_steps = args['train']['epochs'] * len(train_dataloader)
+    # calculate the number of warmup steps
+    # based on args['train']['scheduler']['warmup_ratio'] of the 
+    # total number of training steps
+    n_warmup_steps = math.ceil(n_training_steps * args['train']['scheduler']['warmup_ratio'])
     lr_scheduler = get_scheduler(
         name=args['train']['scheduler']['name'],
         optimizer=optimizer,
         num_training_steps=n_training_steps,
+        num_warmup_steps=n_warmup_steps,
         **args['train']['scheduler']['params']
     ) if args['train']['scheduler']['name'] != "none" else None
 
