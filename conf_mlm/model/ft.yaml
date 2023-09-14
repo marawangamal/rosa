@@ -1,0 +1,6 @@
+# @package _global_
+
+train:
+  epochs: 10
+fnmodel:
+  name: none

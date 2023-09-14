@@ -282,9 +282,10 @@ def preprocess_function_mlm(examples, tokenizer, task_name="cola", max_length=51
     # tokenize the texts, passing two arguments to the tokenizer
     # if the task has two inputs. otherwise just one
     if text_keys[1] is not None:
-        output = tokenizer(examples[text_keys[0]], examples[text_keys[1]], max_length=max_length, truncation=True)
+        # pad to max length
+        output = tokenizer(examples[text_keys[0]], examples[text_keys[1]], max_length=max_length, truncation=True, padding="max_length")
     else:
-        output = tokenizer(examples[text_keys[0]], max_length=max_length, truncation=True)
+        output = tokenizer(examples[text_keys[0]], max_length=max_length, truncation=True, padding="max_length")
     
     # output["labels"] is just "label" for mlm task
     output["labels"] = examples["label"]

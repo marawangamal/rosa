@@ -1,24 +1,25 @@
 runs: 1
 debug: True
 train:
-  epochs: 5
-  lr: 5e-5
-  batch_size: 10
+  epochs: 10
+  lr: 2e-5
+  batch_size: 16
   fraction: 1.0 # ratio of the training set to use
   seq_len: 512
   mark_only_rosa_or_lora_as_trainable: True
   optimizer:
     name: adamw # adam, adamw sgd
     params:
-      momentum: 0.9
-      weight_decay: 0.01
+      betas: [0.9, 0.98]
+      eps: 1e-6
+      weight_decay: 0.1
   scheduler:
     name: linear # linear, cosine, constant, none
-    params:
-      num_warmup_steps: 500
+    warmup_ratio: 0.1
+    params: {}
 model:
   name: roberta-base  # or microsoft/deberta-v2-xxlarge eventually
-  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
 fnmodel:
   name: none # rosa, lora, none
   params:
@@ -28,14 +29,14 @@ fnmodel:
     collapse_fixed: True # for factorized only. collapse fixed parameters
 logging:
   print_freq: 100
-  input_size: [8, 512]  # used to compute latency [batch_size, seq_len]
+  input_size: [8,512]  # used to compute latency [batch_size, seq_len]
   memory_info: True  # record memory usage
 output:
-  path: /home/mila/m/marawan.gamal/scratch/rosa/runs
+  path: /home/mila/a/aristides.milios/scratch/rosa/runs
 dataset:
   name: glue
-  task_name: mnli
-  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
+  task_name: cola
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
 eval:
-  batch_size: 8
+  batch_size: 16
   experiment: runs/glue/cola/roberta-base_factorized_0.01_epoch_random_1.0_5e-05_5_1
