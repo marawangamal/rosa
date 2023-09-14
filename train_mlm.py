@@ -149,12 +149,24 @@ def factorize(args, model, lr_scheduler, optimizer, steps_counter, num_training_
     # New scheduler
     if lr_scheduler is not None:
         del lr_scheduler
+        # lr_scheduler = get_scheduler(
+        #     name=args['train']['scheduler']['name'],
+        #     optimizer=optimizer,
+        #     num_training_steps=num_training_steps,
+        #     **args['train']['scheduler']['params']
+        # )
+
+        # Scheduler
+        # n_training_steps = args['train']['epochs'] * len(train_dataloader)
+        n_warmup_steps = math.ceil(num_training_steps * args['train']['scheduler']['warmup_ratio'])
         lr_scheduler = get_scheduler(
             name=args['train']['scheduler']['name'],
             optimizer=optimizer,
             num_training_steps=num_training_steps,
+            num_warmup_steps=n_warmup_steps,
             **args['train']['scheduler']['params']
-        )
+        ) if args['train']['scheduler']['name'] != "none" else None
+
         for i in range(steps_counter):
             lr_scheduler.step()
 
@@ -322,8 +334,9 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         # Test
         logging.info("=> Computing test metrics...")
-        test_metrics = evaluate(cmodel, device, test_dataloader, \
-            task=args['dataset']['task_name']) if test_dataloader is not None else None
+        test_metrics = evaluate(
+            cmodel, device, test_dataloader, task=args['dataset']['task_name']
+        ) if test_dataloader is not None else None
 
         # Log metrics
         logging.info(
@@ -511,6 +524,11 @@ def main(cfg: DictConfig):
         "none": lambda x, **kwargs: x
     }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
     logging.info("Factorized Model:\n{}".format(cmodel))
+    model_fn = model.module if isinstance(model, nn.DataParallel) else model
+    if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
+        df = model_fn.get_report()
+        logging.info("\n{}".format(df))
+        logging.info(model_fn)
 
     cuda_memory_tracker.track('[main] Created factorized model loaded to cpu')
 

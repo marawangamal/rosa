@@ -71,7 +71,8 @@ class PeftLinear(nn.Module):
         """Merge `a` and `b` with `w` and make `w` trainable"""
         if not self.merged.item():
             # Merge w and ab
-            self.w.data = (self.alpha/self.rank) * self.a.data @ self.b.data + self.w.data
+            self.w.data = (self.alpha/self.rank) * self.a.data @ self.b.data + self.w.data if self.use_scale \
+                else self.a.data @ self.b.data + self.w.data
 
             # todo: empty a and b tensors to save memory
             # Make a, b fixed and w trainable
@@ -181,5 +182,5 @@ class PeftLinear(nn.Module):
         else:
             # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
             a = (self.alpha/self.rank) * self.a if self.use_scale else self.a
-            return x @ a @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
-                else x @ a @ self.b + x @ self.w
+            return (x @ a) @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
+                else (x @ a) @ self.b + x @ self.w

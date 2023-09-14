@@ -212,6 +212,46 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
     for i_step, batch in enumerate(train_dataloader):
 
+        # if i_step % log_frequency == 0:
+        #
+        #     # Evaluate
+        #     valid_metrics = evaluate(model, device, valid_dataloader)
+        #
+        #     # Test
+        #     test_metrics_advanced = evaluate_model(
+        #         model,
+        #         test_dataset=test_dataset,
+        #         tokenizer=tokenizer,
+        #         device=device
+        #     ) if test_dataset is not None else None
+        #     test_metrics = evaluate(cmodel, device, test_dataloader) if test_dataloader is not None else None
+        #
+        #     # Combine test metrics
+        #     test_metrics = {**test_metrics, **test_metrics_advanced}
+        #
+        #     # Log to tensorboard
+        #     if valid_metrics is not None:
+        #         for m in valid_metrics.keys():
+        #             if m is not None:
+        #                 writer.add_scalar("valid/{}".format(m), valid_metrics[m], i_epoch)
+        #                 wandb.log({"valid/{}".format(m): valid_metrics[m]}, step=i_epoch)
+        #
+        #     if test_metrics is not None:
+        #         for m in test_metrics.keys():
+        #             if m is not None:
+        #                 writer.add_scalar("test/{}".format(m), test_metrics[m], i_epoch)
+        #                 wandb.log({"test/{}".format(m): test_metrics[m]}, step=i_epoch)
+        #
+        #     writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], i_epoch)
+        #     wandb.log({"train/lr": optimizer.param_groups[0]['lr']}, step=i_epoch)
+        #
+        #     # Get trainable parameters
+        #     n_trainable_params = 0
+        #     for name, param in cmodel.named_parameters():
+        #         n_trainable_params += param.numel() if param.requires_grad else 0
+        #     writer.add_scalar("train/trainable_params", n_trainable_params, i_epoch)
+
+
         batch = {k: v.to(device) for k, v in batch.items()}
         cuda_memory_tracker.track("[train_epoch] After batch to device")
 

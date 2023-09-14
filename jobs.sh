@@ -13,6 +13,8 @@ source /home/mila/m/marawan.gamal/.venv/rosa/bin/activate
 
 # 3. Copy your dataset on the compute node
 cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
+python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1
+
 
 python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.factorize_mode=bottom fnmodel.params.rank=2 train.epochs=5
 python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.factorize_mode=top fnmodel.params.rank=2 train.epochs=5

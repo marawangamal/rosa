@@ -40,10 +40,10 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
                         output_path_preds=None, output_path_refs=None, compute_bleu=True):
     cmodel.eval()
     # Overwrite output files
-    if os.path.exists(output_path_preds):
+    if output_path_preds is not None os.path.exists(output_path_preds):
         os.remove(output_path_preds)
 
-    if os.path.exists(output_path_refs):
+    if output_path_refs is not None and os.path.exists(output_path_refs):
         os.remove(output_path_refs)
 
     # Used to ensure that the number of predictions and references are equal
@@ -117,26 +117,25 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
                     zip(output_strs, batch)
                 ]
 
-                # Append references to `output_path_refs`
-                with open(output_path_refs, "a", encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    for refs in references:
-                        try:
-                            rw = [[ref] for ref in refs]
-                            writer.writerows(rw)
-                        except:
-                            raise ValueError("References must be a list of strings. Got refs: {}".format(refs))
-                        writer.writerow([])
-                        num_mrs += 1
+                if output_path_preds is not None and output_path_refs is not None:
+                    # Append references to `output_path_refs`
+                    with open(output_path_refs, "a", encoding='utf-8') as f:
+                        writer = csv.writer(f)
+                        for refs in references:
+                            try:
+                                rw = [[ref] for ref in refs]
+                                writer.writerows(rw)
+                            except:
+                                raise ValueError("References must be a list of strings. Got refs: {}".format(refs))
+                            writer.writerow([])
+                            num_mrs += 1
 
-                with open(output_path_preds, "a", encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    for pred in output_strs:
-                        writer.writerow([pred])
-                        num_preds += 1
+                    with open(output_path_preds, "a", encoding='utf-8') as f:
+                        writer = csv.writer(f)
+                        for pred in output_strs:
+                            writer.writerow([pred])
+                            num_preds += 1
 
-                # print("Number of MRs: {}".format(num_mrs))
-                # print("Number of preds: {}".format(num_preds))
                 assert num_mrs == num_preds, "Number of predictions and references must be equal"
 
                 if compute_bleu:

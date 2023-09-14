@@ -19,24 +19,24 @@ train:
     params: {}
 model:
   name: roberta-base
-  cache: /home/mila/a/aristides.milios/scratch/hf_cache
+  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
 fnmodel:
   name: none
   params:
     rank: 0.01
     level: epoch
-    sample_method: random
-    collapse_fixed: true
+    factorize_mode: random  # ["random", "top", "bottom"]
+    use_scale: False  # scale factorization by rank
 logging:
   print_freq: 100
   input_size: [8, 512]
   memory_info: true
 output:
-  path: /home/mila/a/aristides.milios/scratch/rosa/runs
+  path: /home/mila/m/marawan.gamal/scratch/rosa/runs
 dataset:
   name: glue
   task_name: cola
-  cache: /home/mila/a/aristides.milios/scratch/hf_cache
+  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
 eval:
   batch_size: 16
   experiment: runs/glue/cola/roberta-base_factorized_0.01_epoch_random_1.0_5e-05_5_1

@@ -43,7 +43,7 @@ groups:
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=5e-5
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=2e-3
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=ia3 train.lr=2e-3
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1
+#      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=2
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=3
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=4
