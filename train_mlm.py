@@ -411,7 +411,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         logging.info("\nEND of Epoch\n=========\n")
 
 
-@hydra.main(version_base=None, config_path="./", config_name="configs_mlm")
+@hydra.main(version_base=None, config_path="./conf_mlm", config_name="mlm")
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)

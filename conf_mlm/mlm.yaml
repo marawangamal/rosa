@@ -1,0 +1,42 @@
+runs: 1
+debug: true
+train:
+  epochs: 10
+  lr: 2.0e-05
+  batch_size: 16
+  fraction: 1.0
+  seq_len: 512
+  mark_only_rosa_or_lora_as_trainable: true
+  optimizer:
+    name: adamw
+    params:
+      betas: [0.9, 0.98]
+      eps: 1.0e-06
+      weight_decay: 0.1
+  scheduler:
+    name: linear
+    warmup_ratio: 0.1
+    params: {}
+model:
+  name: roberta-base
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
+fnmodel:
+  name: none
+  params:
+    rank: 0.01
+    level: epoch
+    sample_method: random
+    collapse_fixed: true
+logging:
+  print_freq: 100
+  input_size: [8, 512]
+  memory_info: true
+output:
+  path: /home/mila/a/aristides.milios/scratch/rosa/runs
+dataset:
+  name: glue
+  task_name: cola
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
+eval:
+  batch_size: 16
+  experiment: runs/glue/cola/roberta-base_factorized_0.01_epoch_random_1.0_5e-05_5_1
