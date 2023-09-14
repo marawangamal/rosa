@@ -23,10 +23,10 @@ model:
 fnmodel:
   name: none # rosa, lora, none
   params:
-    rank: 0.01  # rank of trainable parameters float in (0,1) or int
-    level: epoch  # for factorized only. "epoch", "batch"
-    sample_method: random  # for factorized only. "random", "bottom"
-    collapse_fixed: True # for factorized only. collapse fixed parameters
+    rank: 0.01  # rank of trainable parameters [float in (0,1) or int]
+    level: epoch  # ["epoch", "batch"]
+    factorize_mode: random  # ["random", "top", "bottom"]
+    use_scale: False  # scale factorization by rank
 logging:
   print_freq: 100
   input_size: [8,512]  # used to compute latency [batch_size, seq_len]

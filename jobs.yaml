@@ -62,26 +62,26 @@ groups:
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=15
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=20
       - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=25
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=2 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=3 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=3 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=4 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=5 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=10 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=15 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=20 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=25 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=1 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=2 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=3 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=3 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=4 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=5 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=10 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=15 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=20 fnmodel.params.use_scale=True
-      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=25 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=1 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=2 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=3 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=3 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=4 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=5 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=10 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=15 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=20 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4 fnmodel.params.rank=25 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=1 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=2 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=3 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=3 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=4 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=5 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=10 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=15 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=20 fnmodel.params.use_scale=True
+      - python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4 fnmodel.params.rank=25 fnmodel.params.use_scale=True
 
   - name: MET | E2E_NLG | GPT2-S ROSA (varying factorization mode Bottom/Top/Random)
     preamble:

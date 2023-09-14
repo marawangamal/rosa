@@ -23,7 +23,7 @@ from transformers import AutoConfig
 from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function_mlm
 
-import peftnet as fn
+import peftnet as pn
 import pandas as pd
 
 pd.set_option('display.max_rows', None)
@@ -134,9 +134,9 @@ def evaluate(model, device, eval_dataloader, task="cola"):
     return glue_metric.compute(predictions=predictions, references=references)
 
 
-def sample_trainable(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
+def factorize(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
     # Mask gradients
-    model = model.module.sample_trainable() if isinstance(model, nn.DataParallel) else model.sample_trainable()
+    model = model.module.factorize() if isinstance(model, nn.DataParallel) else model.factorize()
 
     # New optimizer
     opt_cls = optimizer.__class__
@@ -201,12 +201,12 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
         if args['fnmodel']['name'] == 'rosa' and args['fnmodel']['params']['level'] == "batch":
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
 
-            model, optimizer, lr_scheduler = sample_trainable(
+            model, optimizer, lr_scheduler = factorize(
                 args, model, lr_scheduler, optimizer, steps_counter, num_training_steps
             )
-            cuda_memory_tracker.track("[train_epoch] After sample_trainable")
+            cuda_memory_tracker.track("[train_epoch] After factorize")
 
-            latency_report.stop(name="sample_trainable")
+            latency_report.stop(name="factorize")
 
             n_trainable_params = get_num_trainable_params(model)
 
@@ -253,7 +253,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
         steps_counter += 1
 
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
-    if isinstance(model_fn, fn.RosaNet) or isinstance(model_fn, fn.LoraNet):
+    if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
         df = model_fn.get_report()
         logging.info(df)
         logging.info(model_fn)
@@ -296,7 +296,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         # Mask gradients of RosaNet
         if args['fnmodel']['name'] == "rosa" and args['fnmodel']['params']['level'] == "epoch":
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
-            cmodel, optimizer, lr_scheduler = sample_trainable(
+            cmodel, optimizer, lr_scheduler = factorize(
                 args, cmodel, lr_scheduler, optimizer, steps_counter, num_training_steps
             )
 
@@ -405,8 +405,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         ))
 
         model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.peft_model if isinstance(model_fn, fn.RosaNet) else model_fn
-        model_fn = model_fn.peft_model if isinstance(model_fn, fn.LoraNet) else model_fn
+        model_fn = model_fn.peft_model if isinstance(model_fn, pn.RosaNet) else model_fn
+        model_fn = model_fn.peft_model if isinstance(model_fn, pn.LoraNet) else model_fn
 
         logging.info("\nEND of Epoch\n=========\n")
 
@@ -505,7 +505,10 @@ def main(cfg: DictConfig):
     # Factorize model either using ROSA or LORA
     logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
     cmodel = {
-        "rosa": fn.RosaNet, "lora": fn.LoraNet, "none": lambda x, **kwargs: x
+        "rosa": pn.RosaNet,
+        "lora": pn.LoraNet,
+        "ia3": pn.IA3Net,
+        "none": lambda x, **kwargs: x
     }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
     logging.info("Factorized Model:\n{}".format(cmodel))
 
