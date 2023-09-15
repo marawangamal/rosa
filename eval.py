@@ -37,10 +37,10 @@ def get_data(dataset_name, dataset_cache):
 
 
 def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
-                        output_path_preds=None, output_path_refs=None, compute_bleu=True):
+                   output_path_preds=None, output_path_refs=None, compute_bleu=True):
     cmodel.eval()
     # Overwrite output files
-    if output_path_preds is not None os.path.exists(output_path_preds):
+    if output_path_preds is not None and os.path.exists(output_path_preds):
         os.remove(output_path_preds)
 
     if output_path_refs is not None and os.path.exists(output_path_refs):
@@ -65,16 +65,18 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
         model_fn.eval()
         gen_cfg = GenerationConfig(
             no_repeat_ngram_size=4,
+            num_beams=5,
             max_length=512,
             pad_token_id=tokenizer.pad_token_id,
-            eos_token_id=tokenizer.eos_token_id
+            eos_token_id=tokenizer.eos_token_id,
         )
 
         # Sort dataset by 'meaning_representation' to ensure all similar items are together
         sorted_dataset = sorted(test_dataset, key=lambda x: x['meaning_representation'])
 
         # Group the sorted dataset by `meaning_representation`
-        grouped_data = [list(group) for key, group in groupby(sorted_dataset, key=lambda x: x['meaning_representation'])]
+        grouped_data = [list(group) for key, group in
+                        groupby(sorted_dataset, key=lambda x: x['meaning_representation'])]
 
         # Combine all references for each group
         grouped_data = [
@@ -181,8 +183,10 @@ def evaluate_experiment(experiment_root, test_dataset, overwrite=False, min_reco
             with open(output_path_preds, "r") as f:
                 num_lines = sum(1 for _ in f)
             if num_lines >= min_records:
-                print("\t=> Skipping evaluation. {} already exists and has {} records".format(output_path_preds,
-                                                                                              num_lines))
+                print(
+                    "\t=> Skipping evaluation. {} already exists and has {} records".format(
+                        output_path_preds, num_lines
+                    ))
                 continue
 
         # Define model
