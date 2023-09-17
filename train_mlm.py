@@ -43,6 +43,34 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
 }
 
+task_to_split = {
+    "mnli": {
+        "train": "train",
+        "validation": "validation_matched",
+        "test": "validation_matched"
+    },
+
+    "qnli": {
+        "train": "train",
+        "validation": "validation",
+        "test": "validation"
+    },
+
+    "stsb": {
+        "train": "train",
+        "validation": "validation",
+        "test": "validation"
+    },
+
+    "cola": {
+        "train": "train",
+        "validation": "validation",
+        "test": "validation"
+    },
+
+}
+
+
 def get_dataloaders(args, tokenizer):
     # Load dataset
     assert args['dataset']['name'] == 'glue', "Dataset not supported"
@@ -50,17 +78,17 @@ def get_dataloaders(args, tokenizer):
 
     train_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
-        split='train',
+        split=task_to_split[args['dataset']['task_name']]['train'],
         cache_dir=args['dataset']['cache']
     )
     test_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
-        split='test',
+        split=task_to_split[args['dataset']['task_name']]['test'],
         cache_dir=args['dataset']['cache']
     )
     valid_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
-        split='validation',
+        split=task_to_split[args['dataset']['task_name']]['validation'],
         cache_dir=args['dataset']['cache']
     )
 
@@ -475,7 +503,7 @@ def main(cfg: DictConfig):
 
     tokenizer = AutoTokenizer.from_pretrained(
         args['model']['name'],
-        cache_dir=args['model']['cache'],
+        cache_dir=args['dataset']['cache'],
         use_fast=True
     )
 
@@ -486,14 +514,14 @@ def main(cfg: DictConfig):
 
     config = AutoConfig.from_pretrained(
         args['model']['name'],
-        cache_dir=args['model']['cache'],
+        cache_dir=args['dataset']['cache'],
         num_labels=num_labels,
     )
 
     model = AutoModelForSequenceClassification.from_pretrained(
         args['model']['name'],
         config=config,
-        cache_dir=args['model']['cache']
+        cache_dir=args['dataset']['cache']
     )
 
     # import pdb; pdb.set_trace()
