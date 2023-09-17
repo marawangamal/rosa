@@ -19,7 +19,6 @@ train:
     params: {}
 model:
   name: roberta-base
-  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
 fnmodel:
   name: none
   params:

@@ -20,13 +20,17 @@ model:
   name: gpt2  # gpt2, gpt2-medium, gpt2-large, gpt2-xl
 fnmodel:
   name: none # [rosa, lora, none]
+  factorize_freq: 1  # factorize every n epochs
   params:
     rank: 0.01  # rank of trainable parameters [float in (0,1) or int]
     level: epoch  # ["epoch", "batch"]
     factorize_mode: random  # ["random", "top", "bottom"]
+    ia3_mode: in  # ["in", "out"]
     use_scale: False  # scale factorization by rank
 logging:
-  print_freq: 100
+  print_freq: 100  # print every n batches
+  eval_freq: 100  # log every n batches
+  eval_level: epoch  # ["epoch", "batch"]
   input_size: [8, 512]  # used to compute latency [batch_size, seq_len]
   memory_info: True  # record memory usage
 output:

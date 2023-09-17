@@ -13,7 +13,8 @@ source /home/mila/m/marawan.gamal/.venv/rosa/bin/activate
 
 # 3. Copy your dataset on the compute node
 cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
-python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1
+python train_mlm.py +task=qnli fnmodel.name=lora fnmodel.params.rank=1
+#                (value): LoraLinear(rank=1, a=torch.Size([768, 1]) grad=True scale=False, alpha=32, b=torch.Size([1, 768]) grad=True, w=torch.Size([768, 768]) grad=False, bias=(torch.Size([768]), True))
 
 
 python train.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.factorize_mode=bottom fnmodel.params.rank=2 train.epochs=5

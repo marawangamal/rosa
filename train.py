@@ -34,6 +34,7 @@ pd.set_option('display.float_format', '{:.3f}'.format)
 # todo: model(**batch) to include attn mask [done]
 # todo: divide by rank in model [done]
 # todo: add ia3 model [done]
+# todo: add NIST score
 # todo: add in_out for ia3
 # todo: change model api to do a `factorize` if train mode and a `merge` if eval mode
 
@@ -192,7 +193,8 @@ def get_num_trainable_params(model):
 
 
 def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, epoch, print_freq=10,
-                report_latency=True, steps_counter=0, writer=None):
+                report_latency=True, steps_counter=0, writer=None,
+                valid_dataloader=None, test_dataloader=None, tokenizer=None, test_dataset=None):
     loss_average_meter = AverageMeter()
     ppl_average_meter = AverageMeter()
 
@@ -205,52 +207,53 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
     model.to(device)
     cuda_memory_tracker.track("[train_epoch] After model to device")
 
-    curr_step = lambda epoch, i_step: epoch * len(train_dataloader) + i_step
-
     # Get trainable parameters
     n_trainable_params = get_num_trainable_params(model)
+    step = epoch * len(train_dataloader)
 
     for i_step, batch in enumerate(train_dataloader):
 
-        # if i_step % log_frequency == 0:
-        #
-        #     # Evaluate
-        #     valid_metrics = evaluate(model, device, valid_dataloader)
-        #
-        #     # Test
-        #     test_metrics_advanced = evaluate_model(
-        #         model,
-        #         test_dataset=test_dataset,
-        #         tokenizer=tokenizer,
-        #         device=device
-        #     ) if test_dataset is not None else None
-        #     test_metrics = evaluate(cmodel, device, test_dataloader) if test_dataloader is not None else None
-        #
-        #     # Combine test metrics
-        #     test_metrics = {**test_metrics, **test_metrics_advanced}
-        #
-        #     # Log to tensorboard
-        #     if valid_metrics is not None:
-        #         for m in valid_metrics.keys():
-        #             if m is not None:
-        #                 writer.add_scalar("valid/{}".format(m), valid_metrics[m], i_epoch)
-        #                 wandb.log({"valid/{}".format(m): valid_metrics[m]}, step=i_epoch)
-        #
-        #     if test_metrics is not None:
-        #         for m in test_metrics.keys():
-        #             if m is not None:
-        #                 writer.add_scalar("test/{}".format(m), test_metrics[m], i_epoch)
-        #                 wandb.log({"test/{}".format(m): test_metrics[m]}, step=i_epoch)
-        #
-        #     writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], i_epoch)
-        #     wandb.log({"train/lr": optimizer.param_groups[0]['lr']}, step=i_epoch)
-        #
-        #     # Get trainable parameters
-        #     n_trainable_params = 0
-        #     for name, param in cmodel.named_parameters():
-        #         n_trainable_params += param.numel() if param.requires_grad else 0
-        #     writer.add_scalar("train/trainable_params", n_trainable_params, i_epoch)
+        step = epoch * len(train_dataloader) + i_step
 
+        if args['logging']['eval_level'] == "batch" and i_step % args['logging']['eval_freq'] == 0:
+
+
+            # Evaluate
+            valid_metrics = evaluate(model, device, valid_dataloader)
+
+            # Test
+            test_metrics_advanced = evaluate_model(
+                model,
+                test_dataset=test_dataset,
+                tokenizer=tokenizer,
+                device=device
+            ) if test_dataset is not None else None
+            test_metrics = evaluate(model, device, test_dataloader) if test_dataloader is not None else None
+
+            # Combine test metrics
+            test_metrics = {**test_metrics, **test_metrics_advanced}
+
+            # Log to tensorboard
+            if valid_metrics is not None:
+                for m in valid_metrics.keys():
+                    if m is not None:
+                        writer.add_scalar("valid/{}".format(m), valid_metrics[m], step)
+                        wandb.log({"valid/{}".format(m): valid_metrics[m]}, step=step)
+
+            if test_metrics is not None:
+                for m in test_metrics.keys():
+                    if m is not None:
+                        writer.add_scalar("test/{}".format(m), test_metrics[m], step)
+                        wandb.log({"test/{}".format(m): test_metrics[m]}, step=step)
+
+            writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], step)
+            wandb.log({"train/lr": optimizer.param_groups[0]['lr']}, step=step)
+
+            # Get trainable parameters
+            n_trainable_params = 0
+            for name, param in model.named_parameters():
+                n_trainable_params += param.numel() if param.requires_grad else 0
+            writer.add_scalar("train/trainable_params", n_trainable_params, step)
 
         batch = {k: v.to(device) for k, v in batch.items()}
         cuda_memory_tracker.track("[train_epoch] After batch to device")
@@ -322,10 +325,10 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
     if writer is not None:
         for i, (k, v) in enumerate(cuda_memory_tracker.memory_allocated.items()):
-            writer.add_scalar("train_epoch/memory_allocated", curr_step(epoch, i))
+            writer.add_scalar("train_epoch/memory_allocated/{}".format(k), v,  step)
 
         for i, (k, v) in enumerate(cuda_memory_tracker.memory_reserved.items()):
-            writer.add_scalar("train_epoch/memory_reserved", curr_step(epoch, i))
+            writer.add_scalar("train_epoch/memory_reserved/{}".format(k), v,  step)
 
     return {"loss": loss_average_meter.value,
             "ppl": ppl_average_meter.value,
@@ -358,7 +361,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         epoch_start_time = time.time()
 
         # Refactorize if using ROSA model
-        if args['fnmodel']['name'] == "rosa" and args['fnmodel']['params']['level'] == "epoch":
+        if (args['fnmodel']['name'] == "rosa" and args['fnmodel']['params']['level'] == "epoch"
+                and i_epoch > 0 and args['fnmodel']['factorize_freq'] % i_epoch == 0 ):
             logging.info("=> Re-sampling trainable parameters...")
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
             cmodel, optimizer, lr_scheduler = refactorize(

@@ -36,7 +36,7 @@ def get_data(dataset_name, dataset_cache):
     return test_dataset
 
 
-def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=32,
+def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=8,
                    output_path_preds=None, output_path_refs=None, compute_bleu=True):
     cmodel.eval()
     # Overwrite output files
