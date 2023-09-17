@@ -12,6 +12,7 @@ class IA3Net(PEFTNet):
             model: nn.Module,
             ignore_list: list = None,
             peft_list: list = None,
+            ia3_mode: str = 'in',
             *args, **kwargs
     ):
         """ IA3 PEFT model for efficient adaptation of linear layers
@@ -31,5 +32,5 @@ class IA3Net(PEFTNet):
             ignore_list,
             peft_list,
             replacement_module=IA3Linear,
-            replacement_kwargs=dict(),
+            replacement_kwargs=dict(mode=ia3_mode),
         )
