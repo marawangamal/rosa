@@ -128,7 +128,7 @@ def get_dataloaders(args, tokenizer):
 
     train_dataloader = DataLoader(
         train_tokenized_reduced, shuffle=True, batch_size=args['train']['batch_size'], collate_fn=data_collator,
-        pin_memory=True, num_workers=2
+        pin_memory=True, num_workers=1
     )
     valid_dataloader = DataLoader(
         valid_tokenized_reduced, batch_size=args['train']['batch_size'], collate_fn=data_collator
@@ -159,7 +159,10 @@ def evaluate(model, device, eval_dataloader, task="cola"):
 
     # import pdb; pdb.set_trace()
 
-    return glue_metric.compute(predictions=predictions, references=references)
+    score = glue_metric.compute(predictions=predictions, references=references)
+    # scale score to 0-100 (score is a dict, multiply values by 100)
+    score = {k: v * 100 for k, v in score.items()}
+    return score
 
 
 def factorize(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
