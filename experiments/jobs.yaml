@@ -22,37 +22,26 @@ common_preamble_runs:
   - cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
 
 groups:
-#  - name: MET | E2E_NLG | GPT2-S HP Tuning
-#    preamble:
-#      - "#SBATCH --gres=gpu:2"
-#    paralleljobs:
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=5e-5
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-4
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-2
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-1
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-4
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-2
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-1
+  - name: MET | E2E_NLG | GPT2-S (peft-method, lr)
+    preamble:
+      - "#SBATCH --gres=gpu:2"
+    paralleljobs:
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none fnmodel.params.rank=1 train.lr=5e-5
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=1 train.lr=2e-4
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=1 train.lr=2e-3
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=1 train.lr=2e-2
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.rank=1 train.lr=2e-1
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=1 train.lr=2e-4
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=1 train.lr=2e-3
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=1 train.lr=2e-2
+      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora fnmodel.params.rank=1 train.lr=2e-1
 
-#  - name: MET | E2E_NLG | GPT2-S LoRA/ROSA/IA3/FT
+#  - name: MET | E2E_NLG | GPT2-S (peft-method, rank)
 #    preamble:
 #      - "#SBATCH --gres=gpu:2"
 #    paralleljobs:
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=5e-5
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none train.lr=2e-3
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none
 #      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=ia3 train.lr=2e-3
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=ia3 train.lr=2e-3
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3
-#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3
-#
-#  - name: MET | E2E_NLG | GPT2-S LoRA vs ROSA (rank varies)
-#    preamble:
-#      - "#SBATCH --gres=gpu:2"
-#    paralleljobs:
 #      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1
 #      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=2
 #      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=3
@@ -73,27 +62,27 @@ groups:
 #      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=20
 #      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora train.lr=2e-3 fnmodel.params.rank=25
 
-  - name: MET | E2E_NLG | GPT2-S ROSA (varying factorization mode Bottom/Top/Random)
-    preamble:
-      - "#SBATCH --gres=gpu:2"
-    paralleljobs:
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=2
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=3
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=4
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=5
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=1
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=2
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=3
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=4
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=5
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=1
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=2
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=3
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=4
-      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=5
+#  - name: MET | E2E_NLG | GPT2-S w/ ROSA (Bottom/Top/Random)
+#    preamble:
+#      - "#SBATCH --gres=gpu:2"
+#    paralleljobs:
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=1
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=2
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=3
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=4
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=5
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=1
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=2
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=3
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=4
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=top train.lr=2e-3 fnmodel.params.rank=5
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=1
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=2
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=3
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=4
+#      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa fnmodel.params.factorize_mode=bottom train.lr=2e-3 fnmodel.params.rank=5
 #
-#  - name: MET | E2E_NLG | GPT2-M LoRA vs ROSA (rank varies)
+#  - name: MET | E2E_NLG | GPT2-M (peft-method, rank)
 #    preamble:
 #      - "#SBATCH --gres=gpu:2"
 #    paralleljobs:
@@ -163,11 +152,15 @@ groups:
     preamble:
       - "#SBATCH --gres=gpu:2"
     paralleljobs:
-      - python train_mlm.py fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-5
-      - python train_mlm.py fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-4
-      - python train_mlm.py fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-3
-      - python train_mlm.py fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-2
-      - python train_mlm.py fnmodel.name=rosa +task=cola fnmodel.factorize_freq=10 fnmodel.params.rank=1 train.epochs=10 train.lr=2e-2
-      - python train_mlm.py fnmodel.name=rosa +task=cola fnmodel.factorize_freq=10 fnmodel.params.rank=1 train.epochs=10 train.lr=2e-3
-      - python train_mlm.py fnmodel.name=rosa +task=cola fnmodel.factorize_freq=10 fnmodel.params.rank=1 train.epochs=10 train.lr=2e-4
-      - python train_mlm.py fnmodel.name=rosa +task=cola fnmodel.factorize_freq=10 fnmodel.params.rank=1 train.epochs=10 train.lr=2e-5
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-2
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-3
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-4
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=none +task=cola fnmodel.name=none train.lr=2e-5
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-2
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-3
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-4
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=lora +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-5
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-2
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-3
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-4
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa +task=cola fnmodel.params.rank=1 train.epochs=10 train.lr=2e-5
