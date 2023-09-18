@@ -14,6 +14,7 @@ class RosaNet(PEFTNet):
             use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
+            factorize_mode: str = 'random',
             *args, **kwargs
     ):
         """ ROSA PEFT model for efficient adaptation of linear layers
@@ -30,8 +31,10 @@ class RosaNet(PEFTNet):
 
         """
         super().__init__(
-            model, ignore_list,
-            factorize_list,
+            model,
+            ignore_list=ignore_list,
+            factorize_list=factorize_list,
+            factorize_mode=factorize_mode,
             replacement_module=RosaLinear,
             replacement_kwargs=dict(rank=rank, use_scale=use_scale),
         )

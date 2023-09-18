@@ -86,8 +86,14 @@ class PeftLinear(nn.Module):
 
     def factorize(self, mode: str = 'random'):
         """Factorize `w` into `a` and `b` and make a portion of `a` and `b` trainable"""
+
         if not self.merged:
             self.merge()
+
+        rank_upper_bound = min(self.w.shape)
+        if self.rank >= rank_upper_bound:
+            # If rank is larger than the rank upper bound, train the whole layer
+            return self
 
         # Factorize
         u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
@@ -97,8 +103,6 @@ class PeftLinear(nn.Module):
 
         # Check reconstruction error
         assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
-
-        rank_upper_bound = min(self.w.shape)
         trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=mode)
 
         # Set trainable and fixed parameters
@@ -141,7 +145,7 @@ class PeftLinear(nn.Module):
     def _select_k_from_n(k: int, n: int, mode: str = 'random'):
         """Choose `k` indices from `n` indices"""
 
-        assert 0 < k <= n, "k must be an integer between 0 and n"
+        assert 0 < k < n, f"k must be an integer between 0 and n, received k={k}, n={n}"
         assert isinstance(k, int) and isinstance(n, int), "k and n must be integers"
 
         if mode.lower() == 'random':
@@ -173,8 +177,8 @@ class PeftLinear(nn.Module):
             y: [*, out_features]
         """
 
-        if self.merged.item() and self.training:
-            raise RuntimeError("Cannot call forward on a merged layer in training mode. ")
+        # if self.merged.item() and self.training:
+        #     raise RuntimeError("Cannot call forward on a merged layer in training mode. ")
 
         if self.merged.item():
             # [*, in_features] @ [in_features, out_features] + [out_features, 1] = [*, out_features]
