@@ -1,7 +1,7 @@
 """ Evaluate BLEU for FactorizedNet or LoraNet model
 
 Example:
-python eval_lorank.py eval.experiment=runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9_w0.01_nanone_nu100_namdistillgpt2_namelora_r0.1_leepoch_srandom_t0
+python eval_lorank.py evaltools.experiment=runs/e2e_nlg/e64_l1e-05_b32_f1.0_nsgd_m0.9_w0.01_nanone_nu100_namdistillgpt2_namelora_r0.1_leepoch_srandom_t0
 
 """
 import os
@@ -19,8 +19,8 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.generation import GenerationConfig
 
-from .pymteval import BLEUScore
-import ..peftnet as pn
+from utils.pymteval import BLEUScore
+import peftnet as pn
 from utils.utils import load_object, get_ignore_list_e2e
 
 

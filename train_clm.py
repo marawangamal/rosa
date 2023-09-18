@@ -20,7 +20,7 @@ from transformers import AutoModelForCausalLM
 
 from utils.utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
     CudaMemoryTracker, preprocess_function, get_ignore_list_e2e
-from eval.eval import evaluate_model
+from eval import evaluate_model
 
 import peftnet as pn
 import pandas as pd
@@ -36,7 +36,7 @@ pd.set_option('display.float_format', '{:.3f}'.format)
 # todo: add ia3 model [done]
 # todo: add NIST score
 # todo: add in_out for ia3
-# todo: change model api to do a `factorize` if train mode and a `merge` if eval mode
+# todo: change model api to do a `factorize` if train mode and a `merge` if evaltools mode
 
 
 def get_dataloaders(args, tokenizer):

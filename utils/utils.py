@@ -107,7 +107,7 @@ def saveckpt(model, epoch, optimizer):
     pass
 
 
-def get_yaml_dict(yaml_path="configs.yaml"):
+def get_yaml_dict(yaml_path="conf_clm.yaml"):
     with open(yaml_path, 'r') as stream:
         try:
             return yaml.safe_load(stream)

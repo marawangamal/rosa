@@ -1,24 +1,22 @@
-program: train_clm.py
+program: train_mlm.py
 method: bayes
 metric:
   goal: maximize
-  name: test/bleu
+  name: valid/matthews_correlation
 
-project: rosa-hp-tune
+project: rosa-mlm
 
 parameters:
-  train.optimizer.name:
-    values: [sgd, adamw]
   train.batch_size:
     values: [8, 16, 32]
+  train.epochs:
+    value: 10
   train.lr:
     max: 0.1
     min: 0.0000001
     distribution: uniform
   fnmodel.name:
-    value: lora
-#  fnmodel.params.factorize_mode:
-#    values: [random, top, bottom]
+    value: rosa
 
 command:
   - ${env}

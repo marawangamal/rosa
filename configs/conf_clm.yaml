@@ -30,6 +30,8 @@ fnmodel:
     use_scale: False  # scale factorization by rank
 logging:
   print_freq: 100  # print every n batches
+  eval_level: epoch  # ["epoch", "batch"]
+  eval_freq: 1  # evaluate every n epochs
   input_size: [4, 512]  # used to compute latency [batch_size, seq_len]
   memory_info: True  # record memory usage
 output:
