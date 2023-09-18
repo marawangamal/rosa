@@ -18,9 +18,9 @@ from transformers import DataCollatorForSeq2Seq
 from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
 
-from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker, preprocess_function, get_ignore_list
-from eval import evaluate_model
+from utils.utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
+    CudaMemoryTracker, preprocess_function, get_ignore_list_e2e
+from eval.eval import evaluate_model
 
 import peftnet as pn
 import pandas as pd
@@ -362,7 +362,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         # Refactorize if using ROSA model
         if (args['fnmodel']['name'] == "rosa" and args['fnmodel']['params']['level'] == "epoch"
-                and i_epoch > 0 and args['fnmodel']['factorize_freq'] % i_epoch == 0 ):
+                and i_epoch > 0 and args['fnmodel']['factorize_freq'] % i_epoch == 0):
             logging.info("=> Re-sampling trainable parameters...")
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
             cmodel, optimizer, lr_scheduler = refactorize(
@@ -508,7 +508,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         logging.info("Sample: \n{}\nEND of Epoch\n=========\n".format(sample_str))
 
 
-@hydra.main(version_base=None, config_path="./", config_name="configs")
+@hydra.main(version_base=None, config_path="./configs", config_name="conf_clm")
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
@@ -591,7 +591,7 @@ def main(cfg: DictConfig):
 
         # Factorize model either using ROSA or LORA
         logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
-        ignore_list = get_ignore_list(model) if args['train']['ignore_list'] else None
+        ignore_list = get_ignore_list_e2e(model) if args['fnmodel']['ignore_list'] else None
         cmodel = {
             "rosa": pn.RosaNet,
             "lora": pn.LoraNet,

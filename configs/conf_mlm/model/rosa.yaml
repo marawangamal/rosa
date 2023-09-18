@@ -1,7 +1,4 @@
 # @package _global_
 
-train:
-  epochs: 30
-  lr: 2.0e-04
 fnmodel:
   name: rosa

@@ -6,7 +6,7 @@
 # file.
 #
 # Usage:
-# ./eval.sh <root_directory> <path_to_executable>
+# ./evaltools.sh <root_directory> <path_to_executable>
 #
 # Arguments:
 # <root_directory>: The root directory containing the experiment folders.
@@ -49,7 +49,7 @@ for folder in "$root"/*; do
       # Check if both files exist before running the evaluation
       if [ -f "$reference_file" ] && [ -f "$prediction_file" ]; then
         echo "Evaluating $prediction_file" >> $output_file
-        # Run the eval.py script and append the metrics to the output file
+        # Run the evaltools.py script and append the metrics to the output file
         $executable -p "$reference_file" "$prediction_file" >> $output_file
         echo "" >> $output_file # Add an empty line to separate results
       else

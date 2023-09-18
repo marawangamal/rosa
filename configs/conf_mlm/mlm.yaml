@@ -6,7 +6,6 @@ train:
   batch_size: 16
   fraction: 1.0
   seq_len: 512
-  mark_only_rosa_or_lora_as_trainable: true
   optimizer:
     name: adamw
     params:
@@ -15,12 +14,15 @@ train:
       weight_decay: 0.1
   scheduler:
     name: linear
-    warmup_ratio: 0.1
+    warmup_ratio: 0.06
     params: {}
 model:
   name: roberta-base
 fnmodel:
   name: none
+  factorize_freq: 1  # factorize every n epochs
+  factorize_level: epoch  # ["epoch", "batch"]
+  ignore_list: True # use predefined `ignore_list` consisting pf 'mlp'
   params:
     rank: 0.01
     level: epoch
@@ -28,7 +30,9 @@ fnmodel:
     use_scale: False  # scale factorization by rank
 logging:
   print_freq: 100
-  input_size: [8, 512]
+  eval_freq: 100  # log every n batches
+  eval_level: epoch  # ["epoch", "batch"]
+  input_size: [4, 512]  # used to compute latency [batch_size, seq_len]
   memory_info: true
 output:
   path: /home/mila/m/marawan.gamal/scratch/rosa/runs

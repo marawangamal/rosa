@@ -336,9 +336,17 @@ def check_nan_in_model(model):
     return False
 
 
-def get_ignore_list(model):
+def get_ignore_list_e2e(model):
     ignore_list = []
     for name, layer in model.named_modules():
         if 'mlp' in name:
+            ignore_list.append(name)
+    return ignore_list
+
+
+def get_ignore_list_glue(model):
+    ignore_list = []
+    for name, layer in model.named_modules():
+        if 'attention' not in name:
             ignore_list.append(name)
     return ignore_list

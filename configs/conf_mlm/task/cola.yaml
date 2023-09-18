@@ -1,0 +1,9 @@
+# @package _global_
+
+train:
+  epochs: 80
+  lr: 4e-03
+  batch_size: 32
+  seq_len: 512
+dataset:
+  task_name: cola

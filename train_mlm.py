@@ -1,7 +1,6 @@
 import os
 import os.path as osp
 import math
-import subprocess
 import time
 import logging
 import torch.nn as nn
@@ -10,22 +9,24 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 import torch
+import wandb
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from datasets import load_dataset
 import evaluate as eval_lib
-from transformers import DataCollatorWithPadding, default_data_collator
+from transformers import default_data_collator
 from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForSequenceClassification
 from transformers import AutoConfig
 
-from utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker, preprocess_function_mlm
+from utils.utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
+    CudaMemoryTracker, preprocess_function_mlm, get_ignore_list_glue
 
 import peftnet as pn
 import pandas as pd
 
+wandb.login()
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 2000)
@@ -101,20 +102,20 @@ def get_dataloaders(args, tokenizer):
         lambda examples: preprocess_function_mlm(
             examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']
         ),
-        #batched=True,
+        # batched=True,
         # num_proc=4,
     )
 
     valid_tokenized = valid_dataset.map(
         lambda examples: preprocess_function_mlm(
             examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']),
-        #batched=True
+        # batched=True
     )
 
     test_tokenized = test_dataset.map(
         lambda examples: preprocess_function_mlm(
             examples, tokenizer, task_name=args['dataset']['task_name'], max_length=args['train']['seq_len']),
-        #batched=True
+        # batched=True
     )
 
     # Only include tokenized ids
@@ -137,7 +138,7 @@ def get_dataloaders(args, tokenizer):
     )
 
     # tweak for now since we can't evaluate on test (it's private there's no labels)
-    #return train_dataloader, valid_dataloader, test_dataloader, test_dataset
+    # return train_dataloader, valid_dataloader, test_dataloader, test_dataset
     return train_dataloader, valid_dataloader, None, None
 
 
@@ -149,7 +150,6 @@ def evaluate(model, device, eval_dataloader, task="cola"):
     predictions = []
     references = []
 
-
     with torch.no_grad():
         for batch in eval_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
@@ -157,13 +157,17 @@ def evaluate(model, device, eval_dataloader, task="cola"):
             predictions.extend(torch.argmax(outputs.logits, dim=-1).tolist())
             references.extend(batch['labels'].tolist())
 
-    #import pdb; pdb.set_trace()
-    
+    # import pdb; pdb.set_trace()
+
     return glue_metric.compute(predictions=predictions, references=references)
 
 
 def factorize(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
     # Mask gradients
+    logging.info("\n=> *** Factorizing model at step {} with factorize level {} ***\n".format(
+            steps_counter, args['fnmodel']['factorize_level']
+        )
+    )
     model = model.module.factorize() if isinstance(model, nn.DataParallel) else model.factorize()
 
     # New optimizer
@@ -177,15 +181,8 @@ def factorize(args, model, lr_scheduler, optimizer, steps_counter, num_training_
     # New scheduler
     if lr_scheduler is not None:
         del lr_scheduler
-        # lr_scheduler = get_scheduler(
-        #     name=args['train']['scheduler']['name'],
-        #     optimizer=optimizer,
-        #     num_training_steps=num_training_steps,
-        #     **args['train']['scheduler']['params']
-        # )
 
         # Scheduler
-        # n_training_steps = args['train']['epochs'] * len(train_dataloader)
         n_warmup_steps = math.ceil(num_training_steps * args['train']['scheduler']['warmup_ratio'])
         lr_scheduler = get_scheduler(
             name=args['train']['scheduler']['name'],
@@ -238,7 +235,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
         # Masking FactorizedNet gradients
         latency_report.start()
-        if args['fnmodel']['name'] == 'rosa' and args['fnmodel']['params']['level'] == "batch":
+        if args['fnmodel']['name'] == 'rosa' and args['fnmodel']['factorize_level'] == "batch":
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
 
             model, optimizer, lr_scheduler = factorize(
@@ -250,12 +247,9 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
             n_trainable_params = get_num_trainable_params(model)
 
-        # Forward pass
-        # import pdb; pdb.set_trace()  # todo: need to handle stsb regression task
-
         # get outputs from model, passing in labels as well for loss
         outputs = model(**batch)
-        
+
         cuda_memory_tracker.track("[train_epoch] After forward")
         latency_report.stop(name="forward")
 
@@ -289,7 +283,6 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
             logging.info("{}\n".format(cuda_memory_tracker.report()))
 
         loss_average_meter.add(loss.item())
-        # ppl_average_meter.add(torch.exp(loss).item())
         steps_counter += 1
 
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
@@ -305,13 +298,12 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
         for i, (k, v) in enumerate(cuda_memory_tracker.memory_reserved.items()):
             writer.add_scalar("train_epoch/memory_reserved", curr_step(epoch, i))
 
-    return {"loss": loss_average_meter.value}, optimizer
+    return {"loss": loss_average_meter.value}, optimizer, steps_counter
 
 
 def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device, output_path,
           tokenizer, writer, curr_epoch=1, best_valid_metrics=None, baseline_runtime_metrics=None,
           cuda_memory_tracker=None, test_dataloader=None, test_dataset=None):
-
     # Get runtime metrics
     cuda_memory_tracker = CudaMemoryTracker() if cuda_memory_tracker is None else cuda_memory_tracker
     factorized_mean_mean, factorized_mean_std = get_latency(
@@ -334,7 +326,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         epoch_start_time = time.time()
 
         # Mask gradients of RosaNet
-        if args['fnmodel']['name'] == "rosa" and args['fnmodel']['params']['level'] == "epoch":
+        if args['fnmodel']['name'] == "rosa" and args['fnmodel']['factorize_level'] == "epoch" and \
+                (i_epoch == 0 or i_epoch % args['fnmodel']['factorize_freq'] == 0):
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
             cmodel, optimizer, lr_scheduler = factorize(
                 args, cmodel, lr_scheduler, optimizer, steps_counter, num_training_steps
@@ -343,21 +336,24 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             cuda_memory_tracker.track("[train] After epoch level sample trainable")
 
         # Train
-        cuda_memory_tracker.track("[train] Before train epoch")
-        _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
+        if i_epoch > 0:
+            cuda_memory_tracker.track("[train] Before train epoch")
+            _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
 
-        train_metrics, optimizer = train_epoch(
-            args, cmodel, device, train_dataloader, optimizer, lr_scheduler, i_epoch,
-            print_freq=args["logging"]["print_freq"], writer=writer
-        )
+            train_metrics, optimizer, steps_counter = train_epoch(
+                args, cmodel, device, train_dataloader, optimizer, lr_scheduler, i_epoch,
+                print_freq=args["logging"]["print_freq"], writer=writer, steps_counter=steps_counter
+            )
+        else:
+            train_metrics = dict()
+
+            cuda_memory_tracker.track("[train] After train epoch")
+            _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
+
         train_end_time = time.time()
 
-        cuda_memory_tracker.track("[train] After train epoch")
-        _ = writer.add_scalar("train/memory_allocated", torch.cuda.memory_allocated(), i_epoch)
-
         # Evaluate
-        valid_metrics = evaluate(cmodel, device, valid_dataloader, \
-                                 task=args['dataset']['task_name'])
+        valid_metrics = evaluate(cmodel, device, valid_dataloader, task=args['dataset']['task_name'])
         valid_end_time = time.time()
 
         # Test
@@ -367,15 +363,19 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         ) if test_dataloader is not None else None
 
         # Log metrics
-        logging.info(
-            "=> Epoch {:4d}/{:4d} | Elapsed: tr={:5.2f}s tot={:5.2f}s | ".format(
+        elapsed_str = \
+            ("=> Epoch {:4d}/{:4d} | Elapsed: tr={:5.2f}s tot={:5.2f}s | ".format(
                 i_epoch, args["train"]["epochs"], (train_end_time - epoch_start_time),
                 (valid_end_time - epoch_start_time)
             )
-            + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | "
-            + " | ".join([f"Valid {k}: {v:.2f}" for k, v in valid_metrics.items()]) + " | "
-            + " | ".join([f"Test {k}: {v:.2f}" for k, v in test_metrics.items()]) + " | " if test_metrics is not None else ""
-        )
+             + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | "
+             + " | ".join([f"Valid {k}: {v:.2f}" for k, v in valid_metrics.items()]) + " | "
+             + (" | ".join(
+                [f"Test {k}: {v:.2f}" for k, v in test_metrics.items()]) if test_metrics is not None else ""
+                )
+             )
+
+        logging.info(elapsed_str)
         logging.info(cuda_memory_tracker.report())
 
         # Ckpt object
@@ -398,10 +398,10 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         # Save model checkpoint
 
-        # set metric_key depending on the glue task
-        # cola uses 'matthews_correlation'
-        # stsb uses spearmanr
-        # all others use 'accuracy'
+        # set `metric_key` depending on the glue task
+        # cola uses `matthews_correlation`
+        # stsb uses `spearmanr`
+        # all others use `accuracy`
         metric_key = 'accuracy'
         if args['dataset']['task_name'] == 'cola':
             metric_key = 'matthews_correlation'
@@ -422,37 +422,38 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         for m in valid_metrics.keys():
             if m is not None:
                 writer.add_scalar("valid/{}".format(m), valid_metrics[m], i_epoch)
+                wandb.log({"valid/{}".format(m): valid_metrics[m]}, step=i_epoch)
 
         for m in train_metrics.keys():
             if m is not None:
                 writer.add_scalar("train/{}".format(m), train_metrics[m], i_epoch)
+                wandb.log({"train/{}".format(m): train_metrics[m]}, step=i_epoch)
 
         if test_metrics is not None:
             for m in test_metrics.keys():
                 if m is not None:
                     writer.add_scalar("test/{}".format(m), test_metrics[m], i_epoch)
+                    wandb.log({"test/{}".format(m): train_metrics[m]}, step=i_epoch)
 
         writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], i_epoch)
+        wandb.log({"train/lr": optimizer.param_groups[0]['lr']}, step=i_epoch)
 
         # Get trainable parameters
         n_trainable_params = 0
         for name, param in cmodel.named_parameters():
             n_trainable_params += param.numel() if param.requires_grad else 0
         writer.add_scalar("train/trainable_params", n_trainable_params, i_epoch)
+        wandb.log({"train/trainable_params": n_trainable_params}, step=i_epoch)
 
         # Log best valid metrics
         logging.info("=> Best valid metrics: " + " | ".join(
             [f"{k}: {v:.2f}" for k, v in best_valid_metrics.items()]
         ))
 
-        model_fn = cmodel.module if isinstance(cmodel, nn.DataParallel) else cmodel
-        model_fn = model_fn.peft_model if isinstance(model_fn, pn.RosaNet) else model_fn
-        model_fn = model_fn.peft_model if isinstance(model_fn, pn.LoraNet) else model_fn
-
         logging.info("\nEND of Epoch\n=========\n")
 
 
-@hydra.main(version_base=None, config_path="./conf_mlm", config_name="mlm")
+@hydra.main(version_base=None, config_path="configs/conf_mlm", config_name="mlm")
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
@@ -466,7 +467,8 @@ def main(cfg: DictConfig):
 
         dct_latest, dct_best = None, None
 
-        output_path = osp.join(args['output']['path'], args['dataset']['name'], args['dataset']['task_name'], folder_name)
+        output_path = osp.join(args['output']['path'], args['dataset']['name'], args['dataset']['task_name'],
+                               folder_name)
         if not osp.exists(output_path):
             os.makedirs(output_path)
             save_object(args, osp.join(output_path, 'args.pkl'))
@@ -488,6 +490,14 @@ def main(cfg: DictConfig):
                 print("=> Running Experiment: `{}`".format(folder_name))
 
         writer = SummaryWriter(log_dir=output_path)
+        run = wandb.init(
+            mode="disabled",
+            # Set the project where this run will be logged
+            project="rosa-mlm",
+            name=folder_name,
+            # Track hyperparameters and run metadata
+            config=args,
+        )
 
         # Logging configuration
         logging.basicConfig(
@@ -510,7 +520,7 @@ def main(cfg: DictConfig):
     # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
     train_dataloader, valid_dataloader, test_dataloader, test_dataset = get_dataloaders(args, tokenizer)
 
-    num_labels = len(train_dataloader.dataset.unique('labels')) 
+    num_labels = len(train_dataloader.dataset.unique('labels'))
 
     config = AutoConfig.from_pretrained(
         args['model']['name'],
@@ -545,12 +555,13 @@ def main(cfg: DictConfig):
 
     # Factorize model either using ROSA or LORA
     logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
+    ignore_list = get_ignore_list_glue(model) if args['fnmodel']['ignore_list'] else None
     cmodel = {
         "rosa": pn.RosaNet,
         "lora": pn.LoraNet,
         "ia3": pn.IA3Net,
         "none": lambda x, **kwargs: x
-    }[args['fnmodel']['name'].lower()](model, **args['fnmodel']['params'])
+    }[args['fnmodel']['name'].lower()](model, ignore_list=ignore_list, **args['fnmodel']['params'])
     logging.info("Factorized Model:\n{}".format(cmodel))
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
     if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
@@ -590,7 +601,7 @@ def main(cfg: DictConfig):
         cuda_memory_tracker.track('[main] Optimizer passed network parameters')
 
         optimizer.load_state_dict(dct_latest['optimizer_state_dict'])
-        curr_epoch = dct_latest['epoch']
+        curr_epoch = dct_latest['epoch'] + 1
         curr_best_valid_metrics = dct_best['valid_metrics']
         logging.info("=> Resuming training from from epoch {}".format(dct_latest['epoch']))
 
@@ -643,9 +654,9 @@ def main(cfg: DictConfig):
     logging.info(cuda_memory_tracker.report())
     train(
         args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device,
-        output_path, tokenizer, writer, curr_epoch=curr_epoch + 1, best_valid_metrics=curr_best_valid_metrics,
+        output_path, tokenizer, writer, curr_epoch=curr_epoch, best_valid_metrics=curr_best_valid_metrics,
         baseline_runtime_metrics=baseline_runtime_metrics, cuda_memory_tracker=cuda_memory_tracker,
-        test_dataloader=test_dataloader, test_dataset=test_dataset
+        test_dataloader=None, test_dataset=test_dataset
     )
 
     print("=> Experiment: `{}` Succeeded".format(folder_name))

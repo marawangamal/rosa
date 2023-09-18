@@ -19,9 +19,9 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.generation import GenerationConfig
 
-from pymteval import BLEUScore
-import peftnet as pn
-from utils import load_object, get_ignore_list
+from .pymteval import BLEUScore
+import ..peftnet as pn
+from utils.utils import load_object, get_ignore_list_e2e
 
 
 def get_data(dataset_name, dataset_cache):
@@ -196,7 +196,7 @@ def evaluate_experiment(experiment_root, test_dataset, overwrite=False, min_reco
         tokenizer.pad_token = tokenizer.eos_token
 
         # Factorize & Load pretrained model
-        ignore_list = get_ignore_list(model) if experiment_args['train']['ignore_list'] else None
+        ignore_list = get_ignore_list_e2e(model) if experiment_args['train']['ignore_list'] else None
         cmodel = {
             "rosa": pn.RosaNet,
             "lora": pn.LoraNet,
