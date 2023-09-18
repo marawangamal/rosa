@@ -1,0 +1,6 @@
+# @package _global_
+
+output:
+  path: /home/mila/a/aristides.milios/scratch/rosa/runs
+dataset:
+  cache: /home/mila/a/aristides.milios/scratch/hf_cache
