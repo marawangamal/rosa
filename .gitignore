@@ -3,5 +3,6 @@ figures_/
 .idea
 .DS_Store
 runs
+outputs
 __pycache__
 peftnet/__pycache__

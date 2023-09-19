@@ -154,7 +154,10 @@ def evaluate(model, device, eval_dataloader, task="cola"):
         for batch in eval_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
             outputs = model(**batch)
-            predictions.extend(torch.argmax(outputs.logits, dim=-1).tolist())
+            if task == "stsb":
+                predictions.extend(outputs.logits.squeeze(-1).tolist())
+            else:
+                predictions.extend(torch.argmax(outputs.logits, dim=-1).tolist())
             references.extend(batch['labels'].tolist())
 
     # import pdb; pdb.set_trace()
@@ -523,7 +526,12 @@ def main(cfg: DictConfig):
     # train_dataloader, valid_dataloader, valid_dataset, test_dataset = get_dataloaders(args, tokenizer)
     train_dataloader, valid_dataloader, test_dataloader, test_dataset = get_dataloaders(args, tokenizer)
 
-    num_labels = len(train_dataloader.dataset.unique('labels'))
+    is_regression = args['dataset']['task_name'] == 'stsb'
+
+    if is_regression:
+        num_labels = 1
+    else:
+        num_labels = len(train_dataloader.dataset.unique('labels'))
 
     config = AutoConfig.from_pretrained(
         args['model']['name'],
