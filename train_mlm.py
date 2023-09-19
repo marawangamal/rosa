@@ -44,31 +44,26 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
 }
 
+base = {
+    "train": "train",
+    "validation": "validation",
+    "test": "validation"
+}
+
 task_to_split = {
     "mnli": {
         "train": "train",
         "validation": "validation_matched",
         "test": "validation_matched"
     },
-
-    "qnli": {
-        "train": "train",
-        "validation": "validation",
-        "test": "validation"
-    },
-
-    "stsb": {
-        "train": "train",
-        "validation": "validation",
-        "test": "validation"
-    },
-
-    "cola": {
-        "train": "train",
-        "validation": "validation",
-        "test": "validation"
-    },
-
+    "qnli": base.copy(),
+    "stsb": base.copy(),
+    "cola": base.copy(),
+    "rte": base.copy(),
+    "mrpc": base.copy(),
+    "sst2": base.copy(),
+    "qqp": base.copy(),
+    "wnli": base.copy()
 }
 
 
