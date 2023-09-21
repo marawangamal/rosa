@@ -13,7 +13,9 @@ source /home/mila/m/marawan.gamal/.venv/rosa/bin/activate
 
 # 3. Copy your dataset on the compute node
 cp -r /home/mila/m/marawan.gamal/.cache/huggingface $SLURM_TMPDIR/huggingface
-python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=rosa train.lr=2e-3 fnmodel.params.rank=5
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface fnmodel.name=ia3 +task=cola train.lr=2e-2
+
+
 
 
 # Wandb sweep commands

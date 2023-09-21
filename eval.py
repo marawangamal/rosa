@@ -19,7 +19,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.generation import GenerationConfig
 
-from utils.pymteval import BLEUScore
+from utils.pymteval import BLEUScore, NISTScore
 import peftnet as pn
 from utils.utils import load_object, get_ignore_list_e2e
 
@@ -53,6 +53,7 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=8,
     with torch.no_grad():
         logging.info("=> Testing model bleu scores (Device={}) ...".format(device))
         BLEU = BLEUScore()
+        NIST = NISTScore()
 
         # Initialize model
         cmodel.to(device)
@@ -143,6 +144,7 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=8,
                 if compute_bleu:
                     for output_str, reference in zip(output_strs, references):
                         BLEU.append(output_str, reference)
+                        NIST.append(output_str, reference)
 
         # Remove last newline from `output_path_refs`
         with open(output_path_refs, 'rb+') as f:
@@ -157,6 +159,7 @@ def evaluate_model(cmodel, test_dataset, tokenizer, device=None, batch_size=8,
 
         return {
             "bleu": BLEU.score() if compute_bleu else None,
+            "nist": NIST.score() if compute_bleu else None,
         }
 
 

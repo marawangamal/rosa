@@ -21,7 +21,7 @@ from transformers import AutoModelForSequenceClassification
 from transformers import AutoConfig
 
 from utils.utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker, preprocess_function_mlm, get_ignore_list_glue
+    CudaMemoryTracker, preprocess_function_mlm, get_ignore_list_glue, set_seeds
 
 import peftnet as pn
 import pandas as pd
@@ -459,8 +459,13 @@ def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
 
+
     # dump args above to stdout
     print(OmegaConf.to_yaml(cfg))
+
+    if args['seed'] > 0:
+        set_seeds(args['seed'])
+
 
     for t in range(max(1, args["runs"])):
 

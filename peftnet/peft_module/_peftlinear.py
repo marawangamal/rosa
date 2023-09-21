@@ -10,9 +10,11 @@ class PeftLinear(nn.Module):
             in_features: int,
             out_features: int,
             rank: Union[int, float] = 1.0,
+            bias: bool = False,
             use_scale: bool = False,
-            alpha: float = 32,
-            bias: bool = False
+            alpha: float = 32.0,
+            factorize_mode: str = 'random',
+            factorize_method: str = 'equal'  # 'equal', 'add'
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
 
@@ -21,6 +23,10 @@ class PeftLinear(nn.Module):
             out_features: number of output features
             rank: rank of factorized matrices
             bias: whether to include bias
+            use_scale: whether to use scale factor
+            alpha: scale factor
+            factorize_mode: factorize mode [`random`, `top`, `bottom`]
+            factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
 
         Notes:
             - Initialized with random weights and `merged` flag set to False
@@ -28,12 +34,26 @@ class PeftLinear(nn.Module):
 
         """
         super().__init__()
+
+        # Input validation
+        assert isinstance(in_features, int) and isinstance(out_features, int), \
+            "in_features and out_features must be integers"
+        assert isinstance(rank, (int, float)), "rank must be an integer or a float"
+        assert isinstance(bias, bool), "bias must be a boolean"
+        assert isinstance(use_scale, bool), "use_scale must be a boolean"
+        assert isinstance(alpha, (int, float)), "alpha must be an integer or a float"
+        assert factorize_method in ['equal', 'add'], "factorize_method must be one of ['equal', 'add']"
+        assert factorize_mode in ['random', 'top', 'bottom'], \
+            "factorize_mode must be one of ['random', 'top', 'bottom']"
+
         self.in_features = in_features
         self.out_features = out_features
         self.rank = self._integer_rank(rank, full_rank=min(in_features, out_features))
         self.bias = nn.Parameter(torch.zeros(out_features)) if bias else None
         self.use_scale = use_scale
         self.alpha = alpha
+        self.factorize_mode = factorize_mode
+        self.factorize_method = factorize_method
         self.a = nn.Parameter(torch.zeros(in_features, self.rank))
         self.b = nn.Parameter(torch.randn(self.rank, out_features))
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
@@ -84,7 +104,7 @@ class PeftLinear(nn.Module):
             self.merged = torch.tensor([True])
         return self
 
-    def factorize(self, mode: str = 'random'):
+    def factorize(self):
         """Factorize `w` into `a` and `b` and make a portion of `a` and `b` trainable"""
 
         if not self.merged:
@@ -103,14 +123,22 @@ class PeftLinear(nn.Module):
 
         # Check reconstruction error
         assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
-        trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=mode)
+        trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.factorize_mode)
 
         # Set trainable and fixed parameters
         init_a_trainable = a[:, trainable_indices]  # [in_f, r']
         init_b_trainable = b[trainable_indices, :]  # [r', out_f]
         init_a_fixed = a[:, fixed_indices]
         init_b_fixed = b[fixed_indices, :]
-        init_w = init_a_fixed @ init_b_fixed
+
+        if self.factorize_method == 'equal':
+            init_w = init_a_fixed @ init_b_fixed
+        elif self.factorize_method == 'add':
+            init_w = self.w.data
+        else:
+            raise AttributeError(
+                f"Unknown factorize method: {self.factorize_method}. Method must be one of ['equal', 'add']"
+            )
 
         # Initialize
         self.a.data = init_a_trainable
