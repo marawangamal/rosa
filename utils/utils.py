@@ -273,6 +273,16 @@ task_to_keys = {
     "sst2": ("sentence", None),
     "stsb": ("sentence1", "sentence2"),
     "wnli": ("sentence1", "sentence2"),
+    "axb": ("sentence1", "sentence2"),
+    "axg": ("premise", "hypothesis"),
+    "boolq": ("question", "passage"),
+    "cb": ("premise", "hypothesis"),
+    "copa": ("premise", "choice1", "choice2", "question"), # TODO: figure out how to set this up
+    "multirc": ("paragraph", "question", "answer"), # TODO: figure out how to set this up
+    "record": ("passage", "query", "answer"), # TODO: figure out how to set this up
+    "rte": ("premise", "hypothesis"),
+    "wic": ("word", "sentence1", "sentence2"),
+    "wsc.fixed": ("text", "span1_text", "span2_text"),
 }
 
 def preprocess_function_mlm(examples, tokenizer, task_name="cola", max_length=512):

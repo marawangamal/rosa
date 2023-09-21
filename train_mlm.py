@@ -32,18 +32,6 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 2000)
 pd.set_option('display.float_format', '{:.3f}'.format)
 
-task_to_keys = {
-    "cola": ("sentence", None),
-    "mnli": ("premise", "hypothesis"),
-    "mrpc": ("sentence1", "sentence2"),
-    "qnli": ("question", "sentence"),
-    "qqp": ("question1", "question2"),
-    "rte": ("sentence1", "sentence2"),
-    "sst2": ("sentence", None),
-    "stsb": ("sentence1", "sentence2"),
-    "wnli": ("sentence1", "sentence2"),
-}
-
 base = {
     "train": "train",
     "validation": "validation",
@@ -63,14 +51,23 @@ task_to_split = {
     "mrpc": base.copy(),
     "sst2": base.copy(),
     "qqp": base.copy(),
-    "wnli": base.copy()
+    "wnli": base.copy(),
+    "axb": base.copy(),
+    "axg": base.copy(),
+    "boolq": base.copy(),
+    "cb": base.copy(),
+    "copa": base.copy(),
+    "multirc": base.copy(),
+    "record": base.copy(),
+    "wic": base.copy(),
+    "wsc.fixed": base.copy(),
 }
 
 
 def get_dataloaders(args, tokenizer):
     # Load dataset
-    assert args['dataset']['name'] == 'glue', "Dataset not supported"
-    assert args['dataset']['task_name'] in task_to_keys.keys(), "Task not supported"
+    assert args['dataset']['name'] in ["glue", "super_glue"], "Dataset not supported"
+    assert args['dataset']['task_name'] in task_to_split.keys(), "Task not supported"
 
     train_dataset = load_dataset(
         args['dataset']['name'], args['dataset']['task_name'],
@@ -138,7 +135,10 @@ def get_dataloaders(args, tokenizer):
 
 
 def evaluate(model, device, eval_dataloader, task="cola"):
-    glue_metric = eval_lib.load('glue', task)
+    try:
+        metric = eval_lib.load('super_glue', task)
+    except KeyError:
+        metric = eval_lib.load('glue', task)
 
     model.eval()
 
@@ -157,7 +157,7 @@ def evaluate(model, device, eval_dataloader, task="cola"):
 
     # import pdb; pdb.set_trace()
 
-    score = glue_metric.compute(predictions=predictions, references=references)
+    score = metric.compute(predictions=predictions, references=references)
     # scale score to 0-100 (score is a dict, multiply values by 100)
     score = {k: v * 100 for k, v in score.items()}
     return score
@@ -458,6 +458,9 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
+
+    # dump args above to stdout
+    print(OmegaConf.to_yaml(cfg))
 
     for t in range(max(1, args["runs"])):
 
