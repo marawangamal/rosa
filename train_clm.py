@@ -19,7 +19,7 @@ from transformers import AutoTokenizer, get_scheduler
 from transformers import AutoModelForCausalLM
 
 from utils.utils import get_num_params, get_experiment_name, get_latency, AverageMeter, save_object, LatencyReport, \
-    CudaMemoryTracker, preprocess_function, get_ignore_list_e2e
+    CudaMemoryTracker, preprocess_function, get_ignore_list_e2e, set_seeds
 from eval import evaluate_model
 
 import peftnet as pn
@@ -512,6 +512,9 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
+
+    if args['seed'] > 0:
+        set_seeds(args['seed'])
 
     for t in range(max(1, args["runs"])):
 

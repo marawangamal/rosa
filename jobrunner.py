@@ -121,7 +121,9 @@ class SlurmJobManager:
                     not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
                         0].startswith("FAILED") and
                     not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
-                        0].startswith("CANCELLED")):
+                        0].startswith("CANCELLED") and
+                    not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
+                        0].startswith("TIMEOUT")):
 
                 print("Skipping job: {} (Already running)".format(job["group_name"]))
 
@@ -182,6 +184,18 @@ class SlurmJobManager:
         pd.set_option('display.max_colwidth', 150)
         reduced = status_table[['job_id', 'job_status', 'command']]
         print(reduced)
+
+        # totals
+        keys = ["SUBMIT", "PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED", "TIMEOUT"]
+        totals = {k: 0 for k in keys}
+        for status in status_table['job_status']:
+            for k in keys:
+                if status.startswith(k):
+                    totals[k] += 1
+
+        totals_tbl = pd.DataFrame([totals])
+        print(totals_tbl.to_string(index=False))
+
 
 
 if __name__ == '__main__':

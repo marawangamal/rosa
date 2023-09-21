@@ -17,13 +17,16 @@ rank_color_map = dict()
 def rosa_vs_lora_plot_name_func(s):
     name = {"rosa": "ROSA", "factorized": "ROSA", "lora": "LoRA", "none": "Baseline", "ia3": "IA3"}[s.split("_name")[1].split("_")[0]]
     rank = s.split("_r")[1].split("_")[0]
-    method = s.split("_fac")[1].split("_")[0]
-    if name == "ROSA":
-        return name + f" ({method}, r={rank})"
-    elif name == "LoRA":
-        return name + f" (r={rank})"
-    else:
-        return name
+    lr = s.split("_l")[1].split("_")[0]
+    return name + f" (r={rank}, lr={lr})"
+
+def rosa_ablation_name_func(s):
+    name = {"rosa": "ROSA", "factorized": "ROSA", "lora": "LoRA", "none": "Baseline", "ia3": "IA3"}[s.split("_name")[1].split("_")[0]]
+    rank = s.split("_r")[1].split("_")[0]
+    lr = s.split("_l")[1].split("_")[0]
+    fact = s.split("_fact")[1].split("_")[0]
+    freq = s.split("_fa")[1].split("_")[0]
+    return name + f" (r={rank}, lr={lr}, fact={fact}, freq={freq})"
 
 
 def rosa_random_vs_rosa_bottom_name_func(s):
@@ -69,72 +72,76 @@ def random_matplotlib_color(s):
 
 
 experiments = {
-    "rosa_vs_lora_bleu_sm": {
+    # "rosa_vs_lora_bleu_sm": {
+    #     "xlabel": "EPOCH",
+    #     "ylabel": "BLEU",
+    #     "xticks": list(range(1, 6, 1)),
+    #     "scalar_name": "test/bleu",
+    #     "plot_name_func": rosa_vs_lora_plot_name_func,
+    #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--" }[s.split("_name")[1].split("_")[0]],
+    #     # "plot_marker_func": lambda s: random.choice(markers),
+    #     "plot_color_func": rosa_vs_lora_plot_color_func,
+    #     "regex": r'^(?=.*gpt2_).*'
+    # },
+    # "rosa_vs_lora_bleu_md": {
+    #     "xlabel": "EPOCH",
+    #     "ylabel": "BLEU",
+    #     "xticks": list(range(1, 6, 1)),
+    #     "scalar_name": "test/bleu",
+    #     "plot_name_func": rosa_vs_lora_plot_name_func,
+    #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
+    #         s.split("_name")[1].split("_")[0]],
+    #     # "plot_marker_func": lambda s: random.choice(markers),
+    #     "plot_color_func": rosa_vs_lora_plot_color_func,
+    #     "regex": r'^(?=.*gpt2-medium).*'
+    # },
+    # "rosa_vs_lora_cola_base": {
+    #     "xlabel": "EPOCH",
+    #     "ylabel": "BLEU",
+    #     "xticks": list(range(1, 6, 1)),
+    #     "scalar_name": "valid/matthews_correlation",
+    #     "plot_name_func": rosa_vs_lora_plot_name_func,
+    #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
+    #         s.split("_name")[1].split("_")[0]],
+    #     # "plot_marker_func": lambda s: random.choice(markers),
+    #     "plot_color_func": rosa_vs_lora_plot_color_func,
+    #     "regex": r'^(?=.*namroberta-base).*'
+    # },
+    "rosa_vs_lora_cola_base_ablation": {
         "xlabel": "EPOCH",
         "ylabel": "BLEU",
         "xticks": list(range(1, 6, 1)),
-        "scalar_name": "test/bleu",
-        "plot_name_func": rosa_vs_lora_plot_name_func,
-        "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--" }[s.split("_name")[1].split("_")[0]],
-        # "plot_marker_func": lambda s: random.choice(markers),
-        "plot_color_func": rosa_vs_lora_plot_color_func,
-        "regex": r'^(?=.*gpt2_).*'
-    },
-    "rosa_vs_lora_bleu_md": {
-        "xlabel": "EPOCH",
-        "ylabel": "BLEU",
-        "xticks": list(range(1, 6, 1)),
-        "scalar_name": "test/bleu",
-        "plot_name_func": rosa_vs_lora_plot_name_func,
+        "scalar_name": "valid/matthews_correlation",
+        "plot_name_func": rosa_ablation_name_func,
         "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
             s.split("_name")[1].split("_")[0]],
         # "plot_marker_func": lambda s: random.choice(markers),
         "plot_color_func": rosa_vs_lora_plot_color_func,
-        "regex": r'^(?=.*gpt2-medium).*'
+        "regex": r'^(?=.*namroberta-base).*'
     },
-    # "rosa_vs_lora_bpc": {
+    # "rosa_vs_lora_cola_large": {
     #     "xlabel": "EPOCH",
-    #     "ylabel": "BPC",
-    #     # "ylim": (0.9, 5.5),
-    #     # "xlim": (0.9, 5.5),
+    #     "ylabel": "BLEU",
     #     "xticks": list(range(1, 6, 1)),
-    #     "scalar_name": "valid/bpc",
+    #     "scalar_name": "valid/matthews_correlation",
     #     "plot_name_func": rosa_vs_lora_plot_name_func,
-    #     "plot_marker_func": lambda s: {"rosa": "o-", "factorized": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
+    #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
+    #         s.split("_name")[1].split("_")[0]],
     #     # "plot_marker_func": lambda s: random.choice(markers),
     #     "plot_color_func": rosa_vs_lora_plot_color_func,
-    #     "regex": r'^(?=.*random)(?=.*gpt2_).*'
+    #     "regex": r'^(?=.*namroberta-large).*'
     # },
-    # "rosa_random_vs_rosa_bottom_bpc": {
+    # "rosa_vs_lora_qnli_base": {
     #     "xlabel": "EPOCH",
-    #     "ylabel": "BPC",
+    #     "ylabel": "BLEU",
     #     "xticks": list(range(1, 6, 1)),
-    #     "scalar_name": "valid/bpc",
-    #     "plot_name_func": rosa_random_vs_rosa_bottom_name_func,
-    #     "plot_marker_func": lambda s: {"random": "o-", "bottom": "^-."}[s.split("_sa")[1].split("_")[0]],
-    #     "plot_color_func": rosa_vs_lora_plot_color_func,
-    #     "regex": r'^(?=.*factorized)(?=.*gpt2_)|(?=.*namenone)(?=.*gpt2_).*',
-    # },
-    # "rosa_vs_lora_bpc_md": {
-    #     "xlabel": "EPOCH",
-    #     "ylabel": "BPC",
-    #     "xticks": list(range(1, 6, 1)),
-    #     "scalar_name": "valid/bpc",
+    #     "scalar_name": "valid/accuracy",
     #     "plot_name_func": rosa_vs_lora_plot_name_func,
-    #     "plot_marker_func": lambda s: {"rosa": "o-", "factorized": "o-", "lora": "x--", "none": "s-"}[s.split("_name")[1].split("_")[0]],
-    #     "plot_color_func": rosa_vs_lora_plot_color_func,
-    #     "regex": r'^(?=.*random)(?=.*gpt2-medium).*'
-    # },
-    # "rosa_vs_lora_bpc_lg": {
-    #     "xlabel": "EPOCH",
-    #     "ylabel": "BPC",
-    #     "xticks": list(range(1, 6, 1)),
-    #     "scalar_name": "valid/bpc",
-    #     "plot_name_func": rosa_vs_lora_plot_name_func,
-    #     "plot_marker_func": lambda s: {"rosa": "o-", "factorized": "o-", "lora": "x--", "none": "s-"}[
+    #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
     #         s.split("_name")[1].split("_")[0]],
+    #     # "plot_marker_func": lambda s: random.choice(markers),
     #     "plot_color_func": rosa_vs_lora_plot_color_func,
-    #     "regex": r'^(?=.*random)(?=.*gpt2-large).*'
+    #     "regex": r'^(?=.*namroberta-base).*'
     # },
 }
 
@@ -185,6 +192,7 @@ def main(dir_path, output_dir="figures"):
     for exp_name, exp_config in experiments.items():
         print("\nExperiment: {} (scalar: {})\n ".format(exp_name, exp_config['scalar_name']))
         plt.clf()
+        n_exps = 0
         for filename in os.listdir(dir_path):
             if match_string(filename, exp_config['regex']):
                 print("\t", filename)
@@ -199,7 +207,10 @@ def main(dir_path, output_dir="figures"):
                         color=exp_config['plot_color_func'](filename),
                         # alpha=0.7
                     )
+                n_exps += 1
 
+        if n_exps == 0:
+            continue
         if 'xlim' in exp_config:
             plt.xlim(*exp_config['xlim'])
         if 'ylim' in exp_config:
@@ -255,6 +266,5 @@ def main(dir_path, output_dir="figures"):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--fn', default='/network/scratch/m/marawan.gamal/rosa/runs/e2e_nlg')
-    # parser.add_argument('--tag', default='train/bpc')
     args = parser.parse_args()
     main(args.fn)

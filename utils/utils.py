@@ -1,4 +1,5 @@
 import pickle
+import random
 import time
 from csv import writer
 
@@ -350,3 +351,17 @@ def get_ignore_list_glue(model):
         if 'attention' not in name:
             ignore_list.append(name)
     return ignore_list
+
+
+def set_seeds(seed=42):
+    # Python random module
+    random.seed(seed)
+
+    # Numpy
+    np.random.seed(seed)
+
+    # PyTorch
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    torch.backends.cudnn.deterministic = True  # Necessary for reproducibility on CUDA. Might impact performance.
+    torch.backends.cudnn.benchmark = False  # If set to True, it can introduce randomness for certain operations on CUDA
