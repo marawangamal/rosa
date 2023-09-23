@@ -14,6 +14,7 @@ class LoraNet(PEFTNet):
             use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
+            init_method: str = "zero",
             *args, **kwargs
     ):
         """ LoRa PEFT model for efficient adaptation of linear layers
@@ -34,5 +35,5 @@ class LoraNet(PEFTNet):
             ignore_list,
             factorize_list,
             replacement_module=LoraLinear,
-            replacement_kwargs=dict(rank=rank, use_scale=use_scale),
+            replacement_kwargs=dict(rank=rank, use_scale=use_scale, init_method=init_method),
         )

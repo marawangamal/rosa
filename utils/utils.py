@@ -4,6 +4,7 @@ import time
 from csv import writer
 
 import torch
+import torch.nn as nn
 import yaml
 from enum import Enum
 import numpy as np
@@ -263,7 +264,8 @@ def preprocess_function(examples, tokenizer, dataset_name="eli5", max_length=512
         return output
     else:
         raise NotImplementedError
-    
+
+
 task_to_keys = {
     "cola": ("sentence", None),
     "mnli": ("premise", "hypothesis"),
@@ -278,13 +280,14 @@ task_to_keys = {
     "axg": ("premise", "hypothesis"),
     "boolq": ("question", "passage"),
     "cb": ("premise", "hypothesis"),
-    "copa": ("premise", "choice1", "choice2", "question"), # TODO: figure out how to set this up
-    "multirc": ("paragraph", "question", "answer"), # TODO: figure out how to set this up
-    "record": ("passage", "query", "answer"), # TODO: figure out how to set this up
+    "copa": ("premise", "choice1", "choice2", "question"),  # TODO: figure out how to set this up
+    "multirc": ("paragraph", "question", "answer"),  # TODO: figure out how to set this up
+    "record": ("passage", "query", "answer"),  # TODO: figure out how to set this up
     "rte": ("premise", "hypothesis"),
     "wic": ("word", "sentence1", "sentence2"),
     "wsc.fixed": ("text", "span1_text", "span2_text"),
 }
+
 
 def preprocess_function_mlm(examples, tokenizer, task_name="cola", max_length=512):
     # tokenize the texts according to the keys for each glue task
@@ -294,14 +297,16 @@ def preprocess_function_mlm(examples, tokenizer, task_name="cola", max_length=51
     # if the task has two inputs. otherwise just one
     if text_keys[1] is not None:
         # pad to max length
-        output = tokenizer(examples[text_keys[0]], examples[text_keys[1]], max_length=max_length, truncation=True, padding="max_length")
+        output = tokenizer(examples[text_keys[0]], examples[text_keys[1]], max_length=max_length, truncation=True,
+                           padding="max_length")
     else:
         output = tokenizer(examples[text_keys[0]], max_length=max_length, truncation=True, padding="max_length")
-    
+
     # output["labels"] is just "label" for mlm task
     output["labels"] = examples["label"]
 
     return output
+
 
 def group_texts_old(examples, block_size=128):
     # Concatenate all texts across batches. {ids: [List_1, .., List_N]} => [*List_1, ..., *List_N]
@@ -375,3 +380,29 @@ def set_seeds(seed=42):
     torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
     torch.backends.cudnn.deterministic = True  # Necessary for reproducibility on CUDA. Might impact performance.
     torch.backends.cudnn.benchmark = False  # If set to True, it can introduce randomness for certain operations on CUDA
+
+
+def refactorize(model: nn.Module, optimizer: torch.optim):
+    """Refactorize model and update optimizer and scheduler accordingly
+
+    Args:
+        model: peft model to refactorize
+        optimizer: optimizer to update
+
+    Returns:
+        model, optimizer
+    """
+
+    # (Re)factorize model
+    model = model.module.factorize() if isinstance(model, nn.DataParallel) else model.factorize()
+
+    # New optimizer
+    opt_cls = optimizer.__class__
+    lr = optimizer.param_groups[0]['lr']
+    del optimizer
+    optimizer = opt_cls(
+        model.parameters(),
+        lr=lr
+    )
+
+    return model, optimizer

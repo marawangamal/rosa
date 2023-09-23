@@ -123,7 +123,11 @@ class SlurmJobManager:
                     not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
                         0].startswith("CANCELLED") and
                     not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
-                        0].startswith("TIMEOUT")):
+                        0].startswith("TIMEOUT") and
+                    not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
+                        0].startswith("UNKNOWN") and
+                    not self.status_table[self.status_table["command"] == job["command"]]["job_status"].values[
+                        0].startswith("OUT_OF_ME")):
 
                 print("Skipping job: {} (Already running)".format(job["group_name"]))
 
@@ -169,15 +173,21 @@ class SlurmJobManager:
         outpath = osp.join(osp.expanduser(cls.cache_dir), cls.cache_file_status)
         status_table = pd.read_csv(outpath)
 
+        # Ensure `job_id` is an integer
         status = []
 
+        # import pdb; pdb.set_trace()
         for job_id in status_table['job_id']:
-            out = os.popen("sacct -j {} --format state".format(job_id)).read()
-            status_i = out.split("\n")[2].strip()
-            # If status in table ensds with *, then add * to status_i
-            if status_table[status_table['job_id'] == job_id]['job_status'].values[0].endswith("*"):
-                status_i = "{}*".format(status_i)
-            status.append(status_i)
+            try:
+                job_id_int = str(int(job_id))
+                out = os.popen("sacct -j {} --format state".format(job_id_int)).read()
+                status_i = out.split("\n")[2].strip()
+                # If status in table ensds with *, then add * to status_i
+                if status_table[status_table['job_id'] == job_id]['job_status'].values[0].endswith("*"):
+                    status_i = "{}*".format(status_i)
+                status.append(status_i)
+            except:
+                status.append("UNKNOWN")
         status_table['job_status'] = status
         status_table.to_csv(outpath)
 
@@ -186,7 +196,7 @@ class SlurmJobManager:
         print(reduced)
 
         # totals
-        keys = ["SUBMIT", "PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED", "TIMEOUT"]
+        keys = ["UNKNOWN", "SUBMIT", "PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED", "TIMEOUT"]
         totals = {k: 0 for k in keys}
         for status in status_table['job_status']:
             for k in keys:

@@ -14,7 +14,8 @@ class PeftLinear(nn.Module):
             use_scale: bool = False,
             alpha: float = 32.0,
             factorize_mode: str = 'random',
-            factorize_method: str = 'equal'  # 'equal', 'add'
+            factorize_method: str = 'equal',  # 'equal', 'add'
+            init_method: str = 'zero'  # 'zero', 'random'
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
 
@@ -27,6 +28,7 @@ class PeftLinear(nn.Module):
             alpha: scale factor
             factorize_mode: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
+            init_method: initialization method for `a` [`zero`, `random`]
 
         Notes:
             - Initialized with random weights and `merged` flag set to False
@@ -45,6 +47,7 @@ class PeftLinear(nn.Module):
         assert factorize_method in ['equal', 'add'], "factorize_method must be one of ['equal', 'add']"
         assert factorize_mode in ['random', 'top', 'bottom'], \
             "factorize_mode must be one of ['random', 'top', 'bottom']"
+        assert init_method in ['zero', 'random'], "init_method must be one of ['zero', 'random']"
 
         self.in_features = in_features
         self.out_features = out_features
@@ -54,7 +57,9 @@ class PeftLinear(nn.Module):
         self.alpha = alpha
         self.factorize_mode = factorize_mode
         self.factorize_method = factorize_method
-        self.a = nn.Parameter(torch.zeros(in_features, self.rank))
+        self.init_method = init_method
+        self.a = nn.Parameter(torch.zeros(in_features, self.rank)) if self.init_method == 'zero' else \
+            nn.Parameter(torch.randn(in_features, self.rank))
         self.b = nn.Parameter(torch.randn(self.rank, out_features))
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
@@ -71,7 +76,8 @@ class PeftLinear(nn.Module):
             self.bias.data = bias_init
 
     @classmethod
-    def from_module(cls, linear_layer: nn.Module, rank=1.0, fan_in_fan_out=True, *args, **kwargs) -> nn.Module:
+    def from_module(cls, linear_layer: nn.Module, rank=1.0, fan_in_fan_out=True, init_method: str = 'zero',
+                    *args, **kwargs) -> nn.Module:
         """Initialize from a nn.Linear/Conv1D module"""
 
         w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f] if fan_in_fan_out
@@ -82,7 +88,8 @@ class PeftLinear(nn.Module):
         obj = cls(
             in_features=w.size(0), out_features=w.size(1), rank=rank, bias=bias is not None, *args, **kwargs
         )
-        a = torch.zeros(obj.in_features, obj.rank, device=w.device)
+        a = torch.zeros(obj.in_features, obj.rank, device=w.device) if init_method == 'zero' else \
+            torch.randn(obj.in_features, obj.rank, device=w.device)
         b = torch.randn(obj.rank, obj.out_features, device=w.device)
         obj.initialize_weights(w_init=w, a_init=a, b_init=b, bias_init=bias)
         return obj

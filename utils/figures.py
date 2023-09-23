@@ -20,13 +20,15 @@ def rosa_vs_lora_plot_name_func(s):
     lr = s.split("_l")[1].split("_")[0]
     return name + f" (r={rank}, lr={lr})"
 
+
 def rosa_ablation_name_func(s):
     name = {"rosa": "ROSA", "factorized": "ROSA", "lora": "LoRA", "none": "Baseline", "ia3": "IA3"}[s.split("_name")[1].split("_")[0]]
     rank = s.split("_r")[1].split("_")[0]
     lr = s.split("_l")[1].split("_")[0]
+    fact_method = s.split("_facto")[1].split("_")[0]
     fact = s.split("_fact")[1].split("_")[0]
     freq = s.split("_fa")[1].split("_")[0]
-    return name + f" (r={rank}, lr={lr}, fact={fact}, freq={freq})"
+    return name + f" (r={rank}, lr={lr}, fact={fact}, freq={freq}, fmethod={fact_method})"
 
 
 def rosa_random_vs_rosa_bottom_name_func(s):
@@ -181,7 +183,7 @@ def aggregate_scalar(exp_directory, scalar_name):
     return scalar_x, scalar_y
 
 
-def main(dir_path, output_dir="figures"):
+def main(dir_path, output_dir="outputs"):
 
     if not osp.exists(output_dir):
         os.makedirs(output_dir)

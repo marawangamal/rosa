@@ -25,7 +25,7 @@ fnmodel:
   factorize_level: epoch  # ["epoch", "batch"]
   ignore_list: True # use predefined `ignore_list` consisting pf 'mlp'
   params:
-    rank: 0.01
+    rank: 1
     level: epoch
     factorize_mode: random  # ["random", "top", "bottom"]
     factorize_method: equal # ["equal", "add"]  (w \gets usv1 + usv2  vs.  w \gets w + usv2)
