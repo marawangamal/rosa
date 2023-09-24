@@ -3,8 +3,13 @@ import random
 import time
 from csv import writer
 
+import re
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 import torch
 import torch.nn as nn
+import transformers
 import yaml
 from enum import Enum
 import numpy as np
@@ -406,3 +411,47 @@ def refactorize(model: nn.Module, optimizer: torch.optim):
     )
 
     return model, optimizer
+
+
+def heatmap_cumsum_singular_vals(model, regular_expression=".*attention", out_path="figures/cumsum_singular_vals.png"):
+    """Plot heatmap of cumulative sum of singular values in each layer of the model matching the regular expression."""
+    cumsum_singular_vals = {}
+
+    if torch.cuda.is_available():
+        print("Using CUDA.")
+        model.to("cuda:0")
+
+    for name, module in model.named_modules():
+        if bool(re.match(regular_expression, name)):
+            if isinstance(module, nn.Linear) or isinstance(module, transformers.modeling_utils.Conv1D):
+                print("Decomposing `{}`: {}".format(name, module))
+                _, s, _ = torch.svd(module.weight.data)
+                s_norm = s / torch.sum(s)
+                cumsum_singular_vals[name] = torch.cumsum(s_norm, dim=0).cpu().numpy()
+
+    # Check if any layers matched
+    if not cumsum_singular_vals:
+        print("No layers matched the regular expression.")
+        return
+
+    # Convert the dictionary to a 2D NumPy array
+    max_length = max(len(vals) for vals in cumsum_singular_vals.values())
+    array_data = np.zeros((len(cumsum_singular_vals), max_length))
+    row_labels = []
+
+    for i, (name, vals) in enumerate(cumsum_singular_vals.items()):
+        array_data[i, :len(vals)] = vals
+        row_labels.append(name)
+
+    # Plot
+    plt.figure(figsize=(15, 8))
+    plt.imshow(array_data, interpolation='none', aspect='auto', cmap='viridis')
+    plt.colorbar()
+    plt.yticks(np.arange(len(row_labels)), labels=[])
+    plt.xlabel('Singular Value Index')
+    plt.ylabel('Layer')
+    plt.title('Cumulative Sum of Singular Values in Model Layers')
+    plt.savefig(out_path)
+
+
+

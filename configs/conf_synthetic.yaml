@@ -1,5 +1,6 @@
 seed: 42 # random seed
 exps:
+  name: rosa_vs_lora
   true_rank: 24
   peft_rank_max: 24
   peft_rank_step: 8

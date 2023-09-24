@@ -277,11 +277,11 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
         if i_step % print_freq == 0:
             logging.info(
-                "\tEpoch {:4d} | step {:4d}/{:4d} | trainable: {:,} | lr: {:.6f} | loss {:5.2f} ".format(
+                "[Epoch {:4d} Step {:4d}/{:4d}] | trainable: {:,} | lr: {:.6f} | loss {:5.2f} ".format(
                     epoch, i_step, len(train_dataloader), n_trainable_params, optimizer.param_groups[0]['lr'],
                     loss.item()) + ("" if not report_latency else " | " + latency_report.report())
             )
-            logging.info("{}\n".format(cuda_memory_tracker.report()))
+            logging.info("Memory Report: {}\n".format(cuda_memory_tracker.report()))
 
         loss_average_meter.add(loss.item())
         steps_counter += 1
@@ -289,10 +289,10 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
     if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
         df = model_fn.get_report()
-        logging.info(df)
+        logging.info("\n{}".format(df))
         logging.info(model_fn)
 
-    if writer is not None:
+    if writer is not None:  # todo: fix this
         for i, (k, v) in enumerate(cuda_memory_tracker.memory_allocated.items()):
             writer.add_scalar("train_epoch/memory_allocated", curr_step(epoch, i))
 
@@ -365,8 +365,9 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 
         # Log metrics
         elapsed_str = \
-            ("=> Epoch {:4d}/{:4d} | Elapsed: tr={:5.2f}s tot={:5.2f}s | ".format(
-                i_epoch, args["train"]["epochs"], (train_end_time - epoch_start_time),
+            ("=> [Epoch {:4d}/{:4d}] | Elapsed: train={:5.2f}s valid={:5.2f}s | ".format(
+                i_epoch, args["train"]["epochs"],
+                (train_end_time - epoch_start_time),
                 (valid_end_time - epoch_start_time)
             )
              + " | ".join([f"Train {k}: {v:.2f}" for k, v in train_metrics.items()]) + " | "
@@ -451,7 +452,7 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
             [f"{k}: {v:.2f}" for k, v in best_valid_metrics.items()]
         ))
 
-        logging.info("\nEND of Epoch\n=========\n")
+        logging.info("END of Epoch\n=========\n")
 
 
 @hydra.main(version_base=None, config_path="configs/conf_mlm", config_name="mlm")
@@ -509,12 +510,7 @@ def main(cfg: DictConfig):
         )
 
         # Logging configuration
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s',
-            datefmt='%H:%M:%S',
-            filemode='a'
-        )
+        logging.basicConfig(level=logging.INFO)
         logging.getLogger().addHandler(logging.FileHandler(osp.join(output_path, "logging.txt")))
 
     cuda_memory_tracker = CudaMemoryTracker()

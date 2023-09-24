@@ -148,28 +148,60 @@ def main(cfg: DictConfig):
     valid_dataset = torch.utils.data.TensorDataset(x_valid, y_valid)
     valid_dataloader = torch.utils.data.DataLoader(valid_dataset, batch_size=bs, shuffle=False)
 
-    peft_models = {
-        **{
-           "LoRA (r={}):".format(max(r, 1)): pn.LoraNet(copy.deepcopy(init_model), rank=max(r, 1))
-           for r in range(0, peft_rank_max+1, peft_rank_step)
-          },
-        **{
-            "ROSA (r={}):".format(max(r, 1)): pn.RosaNet(copy.deepcopy(init_model), rank=max(r, 1))
-            for r in range(0, peft_rank_max+1, peft_rank_step)
-          }
-    }
+    # Select experiment to run
+    if args['exps']['name'] == "rosa_vs_lora":
+        # Compare LoRA and ROSA at different ranks
 
-    markers = {"LoRA": "--", "ROSA": "-"}
+        peft_models = {
+            **{
+               "LoRA (r={}):".format(max(r, 1)): pn.LoraNet(copy.deepcopy(init_model), rank=max(r, 1))
+               for r in range(0, peft_rank_max+1, peft_rank_step)
+              },
+            **{
+                "ROSA (r={}):".format(max(r, 1)): pn.RosaNet(copy.deepcopy(init_model), rank=max(r, 1))
+                for r in range(0, peft_rank_max+1, peft_rank_step)
+              }
+        }
+        def color_and_marker_func(name):
+            rank_colors = {
+                max(r, 1): plt.cm.get_cmap('tab10')(i) for i, r in
+                enumerate(range(0, peft_rank_max + 1, peft_rank_step))
+            }
+            rank = int(name.split('=')[-1][:-2])
+            color = rank_colors[rank]
+            marker = {"LoRA": "--", "ROSA": "-"}[name.split(" ")[0]]
+            return color, marker
+
+
+    elif args['exps']['name'] == "rosa_ablation_top_bottom":
+        # Compare ROSA with different factorization modes
+
+        peft_models = {
+            "ROSA (r={}, f={})".format(max(r, 1), fmode): pn.RosaNet(
+                copy.deepcopy(init_model), rank=max(r, 1), factorize_mode=fmode.lower()
+            )
+            for r in range(0, peft_rank_max + 1, peft_rank_step)
+            for fmode in ["Top", "Bottom", "Random"]
+        }
+
+        def color_and_marker_func(name):
+            rank_colors = {
+                max(r, 1): plt.cm.get_cmap('tab10')(i) for i, r in
+                enumerate(range(0, peft_rank_max + 1, peft_rank_step))
+            }
+            rank = int(name.split('r=')[-1].split(',')[0])
+            color = rank_colors[rank]
+            marker = {"Top": "^", "Bottom": ".", "Random": "x"}[name.split("f=")[-1][:-1]]
+            return color, marker
+
+    else:
+        raise ValueError("Invalid experiment name: {}".format(args['exps']['name']))
 
     # Train
-    # total_steps = (n_epochs*len(train_dataloader))
-    # factorize_freq = total_steps // factorize_steps
     total_steps = n_epochs
     factorize_freq = max(total_steps // factorize_steps, 1)
     print("Total steps: {} | Factorize freq: {}\n".format(total_steps, factorize_freq))
-    rank_colors = {
-        max(r, 1): plt.cm.get_cmap('tab10')(i) for i, r in enumerate(range(0, peft_rank_max + 1, peft_rank_step))
-    }
+
 
     for name, model in peft_models.items():
 
@@ -195,10 +227,6 @@ def main(cfg: DictConfig):
 
             for i_iter, batch in enumerate(train_dataloader):
 
-                # if i_epoch < n_epochs-1 and ((curr_step % factorize_freq == 0) or (i_epoch == 0 and i_iter == 0)):
-                #     model, optimizer = refactorize(model, optimizer)
-                #     print(f"Refactorized {name} at epoch {i_epoch+1} and iteration {i_iter}")
-
                 x_train, y_train = batch
                 y_pred = model(x_train)
                 loss = loss_fn(y_pred, y_train)
@@ -213,9 +241,7 @@ def main(cfg: DictConfig):
                           f"Loss: {loss.item():.4f} | Val Loss: {val_loss:.4f}")
 
         # Plot
-        rank = int(name.split('=')[-1][:-2])
-        color = rank_colors[rank]
-        marker = markers[name.split(" ")[0]]
+        color, marker = color_and_marker_func(name)
         plt.plot(val_losses, marker, label=name, color=color)
 
     plt.xlabel("Iterations")
@@ -228,5 +254,7 @@ if __name__ == '__main__':
     main()
 
     # python train_synthetic.py model.name=linear
-    # python train_synthetic.py model.name=mlp2 train.epochs=500
-    # python train_synthetic.py model.name=mlp4 train.epochs=500
+    # python train_synthetic.py model.name=linear exps.name=rosa_ablation_top_bottom
+    # python train_synthetic.py model.name=linear exps.peft_rank_max=12 exps.peft_rank_step=4
+    # python train_synthetic.py model.name=mlp2 train.epochs=500 data.n_train_samples=10000
+    # python train_synthetic.py model.name=mlp4 exps.factorize_steps=16 exps.factorize_warmup=100 train.lr=1e-2 train.epochs=500 data.n_train_samples=10000

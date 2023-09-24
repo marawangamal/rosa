@@ -60,7 +60,8 @@ source /home/mila/m/marawan.gamal/.venv/rosa/bin/activate
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=2 train.lr=2e-5
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=2 train.lr=2e-4
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=2 train.lr=2e-3
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=2
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=2 train.lr=2e-4 fnmodel.factorize_freq=4
 
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=lora fnmodel.params.rank=4 train.lr=2e-5
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=lora fnmodel.params.rank=4 train.lr=2e-4
@@ -72,14 +73,22 @@ python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan see
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=lora fnmodel.params.rank=8 train.lr=2e-5
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=lora fnmodel.params.rank=8 train.lr=2e-4
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=lora fnmodel.params.rank=8 train.lr=2e-3
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-5
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-4
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=5e-5
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-4
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-3
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-4 fnmodel.factorize_freq=2
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-4 fnmodel.factorize_freq=3
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=boolq train.epochs=10 train.batch_size=32 fnmodel.name=rosa fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=3
 
 
 
+# CoLA Ablation (SVD, SVD + Ortho, SVD + Ortho + Refactorize)
+
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-3
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-4
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-5
 
 # Wandb sweep commands
 # wandb sweep --project rosa-mlm-sweep sweep_mlm.yaml
