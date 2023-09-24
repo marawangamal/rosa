@@ -277,10 +277,13 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
 
         if i_step % print_freq == 0:
             logging.info(
-                "[Epoch {:4d} Step {:4d}/{:4d}] | trainable: {:,} | lr: {:.6f} | loss {:5.2f} ".format(
-                    epoch, i_step, len(train_dataloader), n_trainable_params, optimizer.param_groups[0]['lr'],
-                    loss.item()) + ("" if not report_latency else " | " + latency_report.report())
+                "[Epoch {:4d} Step {:4d}/{:4d}] | loss {:5.2f} | trainable: {:,} | lr: {:.6f}  ".format(
+                    epoch, i_step, len(train_dataloader),
+                    loss.item(),
+                    n_trainable_params, optimizer.param_groups[0]['lr'],
+                )
             )
+            logging.info("Latency Report: {}".format("" if not report_latency else " | " + latency_report.report()))
             logging.info("Memory Report: {}\n".format(cuda_memory_tracker.report()))
 
         loss_average_meter.add(loss.item())
@@ -364,8 +367,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         ) if test_dataloader is not None else None
 
         # Log metrics
-        elapsed_str = \
-            ("=> [Epoch {:4d}/{:4d}] | Elapsed: train={:5.2f}s valid={:5.2f}s | ".format(
+        epoch_str = \
+            ("=> [Epoch {:4d}/{:4d} train (s): {:5.2f}s valid (s): {:5.2f}] | ".format(
                 i_epoch, args["train"]["epochs"],
                 (train_end_time - epoch_start_time),
                 (valid_end_time - epoch_start_time)
@@ -377,8 +380,8 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
                 )
              )
 
-        logging.info(elapsed_str)
-        logging.info(cuda_memory_tracker.report())
+        logging.info(epoch_str)
+        logging.info("Memory Report: {}".format(cuda_memory_tracker.report()))
 
         # Ckpt object
         try:

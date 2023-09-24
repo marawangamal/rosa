@@ -86,9 +86,28 @@ python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan see
 
 # CoLA Ablation (SVD, SVD + Ortho, SVD + Ortho + Refactorize)
 
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-3
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-4
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-5
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=8 train.lr=2e-2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=8 train.lr=2e-3
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=8 train.lr=2e-4
+
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.factorize_mode=top train.lr=2e-2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.factorize_mode=top train.lr=2e-3
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.factorize_mode=top train.lr=2e-4
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.factorize_mode=bottom train.lr=2e-2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.factorize_mode=bottom train.lr=2e-3
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.factorize_mode=bottom train.lr=2e-4
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=2 fnmodel.params.factorize_mode=top train.lr=2e-2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=2 fnmodel.params.factorize_mode=top train.lr=2e-3
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=2 fnmodel.params.factorize_mode=top train.lr=2e-4
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=2 fnmodel.params.factorize_mode=bottom train.lr=2e-2
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=2 fnmodel.params.factorize_mode=bottom train.lr=2e-3
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.factorize_freq=2 fnmodel.params.factorize_mode=bottom train.lr=2e-4
+
+
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=8 train.lr=2e-2
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=8 train.lr=2e-3
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=8 train.lr=2e-4
+
 
 # Wandb sweep commands
 # wandb sweep --project rosa-mlm-sweep sweep_mlm.yaml
