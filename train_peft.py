@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 batch_size = 32
 model_name_or_path = "roberta-base"
-task = "mrpc"
+task = "boolq"
 peft_type = PeftType.LORA
 device = "cuda"
 num_epochs = 20
@@ -31,8 +31,9 @@ CACHE_DIR = "/home/mila/a/aristides.milios/scratch/hf_cache"
 
 r = 2
 lr = 3e-4
+#lr = 3e-3 <== causes training to collapse
 
-peft_config = LoraConfig(task_type="SEQ_CLS", inference_mode=False, r=r, lora_alpha=16, lora_dropout=0.1, target_modules=["query", "value"], bias='none')
+peft_config = LoraConfig(task_type="SEQ_CLS", inference_mode=False, r=r, lora_alpha=16, lora_dropout=0.1, target_modules=["query", "key", "value", "output.dense"])
 
 if any(k in model_name_or_path for k in ("gpt", "opt", "bloom")):
     padding_side = "left"
@@ -43,20 +44,20 @@ tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side=paddi
 if getattr(tokenizer, "pad_token_id") is None:
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-datasets = load_dataset("glue", task, cache_dir=CACHE_DIR)
-metric = evaluate.load("glue", task)
+datasets = load_dataset("super_glue", task, cache_dir=CACHE_DIR)
+metric = evaluate.load("super_glue", task)
 
 
 def tokenize_function(examples):
     # max_length=None => use the model max length (it's actually the default)
-    outputs = tokenizer(examples["sentence1"], examples["sentence2"], truncation=True, max_length=None)
+    outputs = tokenizer(examples["question"], examples["passage"], truncation=True, max_length=None)
     return outputs
 
 
 tokenized_datasets = datasets.map(
     tokenize_function,
     batched=True,
-    remove_columns=["idx", "sentence1", "sentence2"],
+    remove_columns=["idx", "question", "passage"],
 )
 
 # We also rename the 'label' column to 'labels' which is the expected name for labels by the models of the
@@ -76,6 +77,14 @@ eval_dataloader = DataLoader(
 
 model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, cache_dir=CACHE_DIR)
 model = get_peft_model(model, peft_config)
+
+print(model)
+
+#import pdb; pdb.set_trace()
+
+for param in model.classifier.parameters():
+    param.requires_grad = False
+
 model.print_trainable_parameters()
 
 optimizer = AdamW(params=model.parameters(), lr=lr)
