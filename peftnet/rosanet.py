@@ -16,6 +16,7 @@ class RosaNet(PEFTNet):
             factorize_list: list = None,
             factorize_mode: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
+            debug: bool = False,
             *args, **kwargs
     ):
         """ ROSA PEFT model for efficient adaptation of linear layers
@@ -27,6 +28,7 @@ class RosaNet(PEFTNet):
             factorize_list: names of modules types to replace
             factorize_mode: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
+            debug: whether to use debug mode
 
         Notes:
             - only modules types in `factorize_list` will be factorized
@@ -39,7 +41,8 @@ class RosaNet(PEFTNet):
             factorize_list=factorize_list,
             replacement_module=RosaLinear,
             replacement_kwargs=dict(
-                rank=rank, use_scale=use_scale, factorize_mode=factorize_mode, factorize_method=factorize_method
+                rank=rank, use_scale=use_scale, factorize_mode=factorize_mode, factorize_method=factorize_method,
+                debug=debug
             ),
         )
 

@@ -51,29 +51,6 @@ class MLP2Layer(nn.Module):
         return self.l2(nn.functional.relu(self.l1(x)))
 
 
-class MLP4Layer(nn.Module):
-    """A 4-layer multi-layer perceptron."""
-    def __init__(self, in_features=768, out_features=32, hidden=64, bias=False):
-        super().__init__()
-        self.l1 = nn.Linear(in_features, hidden, bias=bias)
-        self.l2 = nn.Linear(hidden, hidden, bias=bias)
-        self.l3 = nn.Linear(hidden, hidden, bias=bias)
-        self.l4 = nn.Linear(hidden, out_features, bias=bias)
-
-    def forward(self, x):
-        """ Forward pass.
-
-        Args:
-            x: [batch_size, in_features]
-
-        Returns:
-            y: [batch_size, out_features]
-
-        """
-        rlu = nn.functional.relu
-        return self.l4(rlu(self.l3(rlu(self.l2(rlu(self.l1(x)))))))
-
-
 def build_synthetic_dataset(model, n_samples=1000, n_dims=768):
     """Build a synthetic dataset from a given model."""
     with torch.no_grad():
@@ -253,8 +230,8 @@ def main(cfg: DictConfig):
 if __name__ == '__main__':
     main()
 
-    # python train_synthetic.py model.name=linear
-    # python train_synthetic.py model.name=linear exps.name=rosa_ablation_top_bottom
-    # python train_synthetic.py model.name=linear exps.peft_rank_max=12 exps.peft_rank_step=4
-    # python train_synthetic.py model.name=mlp2 train.epochs=500 data.n_train_samples=10000
-    # python train_synthetic.py model.name=mlp4 exps.factorize_steps=16 exps.factorize_warmup=100 train.lr=1e-2 train.epochs=500 data.n_train_samples=10000
+    # 1-layer
+    # python train_synthetic.py model.name=linear exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=500
+
+    # 2-layer
+    # python train_synthetic.py model.name=mlp2 exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=1000

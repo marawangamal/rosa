@@ -512,11 +512,13 @@ def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
-
-    if args['seed'] > 0:
-        set_seeds(args['seed'])
+    print(OmegaConf.to_yaml(cfg))
 
     for t in range(max(1, args["runs"])):
+
+        # Set diff seeds for each run
+        if args['seed'] > 0:
+            set_seeds(int(args['seed'] + t))
 
         exp_name = get_experiment_name(
             {"train": args["train"], "model": args["model"], "fnmodel": args["fnmodel"], "trial": t}

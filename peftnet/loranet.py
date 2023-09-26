@@ -15,6 +15,7 @@ class LoraNet(PEFTNet):
             ignore_list: list = None,
             factorize_list: list = None,
             init_method: str = "zero",
+            debug: bool = False,
             *args, **kwargs
     ):
         """ LoRa PEFT model for efficient adaptation of linear layers
@@ -24,6 +25,7 @@ class LoraNet(PEFTNet):
             rank: rank of factorized matrices
             ignore_list: names of layers to ignore
             factorize_list: names of modules types to replace
+            debug: whether to use debug mode
 
         Notes:
             - only modules types in `factorize_list` will be factorized
@@ -35,5 +37,5 @@ class LoraNet(PEFTNet):
             ignore_list,
             factorize_list,
             replacement_module=LoraLinear,
-            replacement_kwargs=dict(rank=rank, use_scale=use_scale, init_method=init_method),
+            replacement_kwargs=dict(rank=rank, use_scale=use_scale, init_method=init_method, debug=debug),
         )

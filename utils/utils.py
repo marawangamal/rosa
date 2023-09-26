@@ -288,7 +288,6 @@ task_to_keys = {
     "copa": ("premise", "choice1", "choice2", "question"),  # TODO: figure out how to set this up
     "multirc": ("paragraph", "question", "answer"),  # TODO: figure out how to set this up
     "record": ("passage", "query", "answer"),  # TODO: figure out how to set this up
-    "rte": ("premise", "hypothesis"),
     "wic": ("word", "sentence1", "sentence2"),
     "wsc.fixed": ("text", "span1_text", "span2_text"),
 }

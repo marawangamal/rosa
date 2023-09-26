@@ -192,7 +192,6 @@ class SlurmJobManager:
         status_table['job_status'] = status
         status_table.to_csv(outpath)
 
-        pd.set_option('display.max_colwidth', 150)
         reduced = status_table[['job_id', 'job_status', 'command']]
         print(reduced)
 

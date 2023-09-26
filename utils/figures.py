@@ -31,13 +31,14 @@ def rosa_ablation_name_func(s):
     return name + f" (r={rank}, lr={lr}, fact={fact}, freq={freq}, fmethod={fact_method})"
 
 
-def rosa_random_vs_rosa_bottom_name_func(s):
-    if "namenone" in s:
-        return "Baseline"
-    # e5_l0.0002_b8_f1.0_s512_nsgd_m0.9_w0.01_nalinear_nu500_namgpt2_namelora_r0.1_leepoch_sarandom_cFalse_t0
-    name = {"random": "Random", "bottom": "Bottom", "top": "Top"}[s.split("_sa")[1].split("_")[0]]
+def default_name_func(s):
+    name = {"rosa": "ROSA", "factorized": "ROSA", "lora": "LoRA", "none": "Baseline", "ia3": "IA3"}[s.split("_name")[1].split("_")[0]]
     rank = s.split("_r")[1].split("_")[0]
-    return name + f" (r={rank})"
+    lr = s.split("_l")[1].split("_")[0]
+    fact_method = s.split("_facto")[1].split("_")[0]
+    fact = s.split("_fact")[1].split("_")[0]
+    freq = s.split("_fa")[1].split("_")[0]
+    return name + f" (r={rank}, lr={lr}, fact={fact}, freq={freq}, fmethod={fact_method})"
 
 
 def rosa_vs_lora_plot_color_func(s, cmap_name="tab20", n_pts=64):
@@ -79,7 +80,7 @@ experiments = {
     #     "ylabel": "BLEU",
     #     "xticks": list(range(1, 6, 1)),
     #     "scalar_name": "test/bleu",
-    #     "plot_name_func": rosa_vs_lora_plot_name_func,
+    #     "plot_name_func": default_name_func,
     #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--" }[s.split("_name")[1].split("_")[0]],
     #     # "plot_marker_func": lambda s: random.choice(markers),
     #     "plot_color_func": rosa_vs_lora_plot_color_func,
@@ -90,43 +91,43 @@ experiments = {
     #     "ylabel": "BLEU",
     #     "xticks": list(range(1, 6, 1)),
     #     "scalar_name": "test/bleu",
-    #     "plot_name_func": rosa_vs_lora_plot_name_func,
+    #     "plot_name_func": default_name_func,
     #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
     #         s.split("_name")[1].split("_")[0]],
     #     # "plot_marker_func": lambda s: random.choice(markers),
     #     "plot_color_func": rosa_vs_lora_plot_color_func,
     #     "regex": r'^(?=.*gpt2-medium).*'
     # },
-    # "rosa_vs_lora_cola_base": {
-    #     "xlabel": "EPOCH",
-    #     "ylabel": "BLEU",
-    #     "xticks": list(range(1, 6, 1)),
-    #     "scalar_name": "valid/matthews_correlation",
-    #     "plot_name_func": rosa_vs_lora_plot_name_func,
-    #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
-    #         s.split("_name")[1].split("_")[0]],
-    #     # "plot_marker_func": lambda s: random.choice(markers),
-    #     "plot_color_func": rosa_vs_lora_plot_color_func,
-    #     "regex": r'^(?=.*namroberta-base).*'
-    # },
-    "rosa_vs_lora_cola_base_ablation": {
+    "rosa_vs_lora_cola_base": {
         "xlabel": "EPOCH",
         "ylabel": "BLEU",
         "xticks": list(range(1, 6, 1)),
         "scalar_name": "valid/matthews_correlation",
-        "plot_name_func": rosa_ablation_name_func,
+        "plot_name_func": default_name_func,
         "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
             s.split("_name")[1].split("_")[0]],
         # "plot_marker_func": lambda s: random.choice(markers),
         "plot_color_func": rosa_vs_lora_plot_color_func,
         "regex": r'^(?=.*namroberta-base).*'
     },
+    # "rosa_vs_lora_cola_base_ablation": {
+    #     "xlabel": "EPOCH",
+    #     "ylabel": "BLEU",
+    #     "xticks": list(range(1, 6, 1)),
+    #     "scalar_name": "valid/matthews_correlation",
+    #     "plot_name_func": default_name_func,
+    #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
+    #         s.split("_name")[1].split("_")[0]],
+    #     # "plot_marker_func": lambda s: random.choice(markers),
+    #     "plot_color_func": rosa_vs_lora_plot_color_func,
+    #     "regex": r'^(?=.*namroberta-base).*'
+    # },
     # "rosa_vs_lora_cola_large": {
     #     "xlabel": "EPOCH",
     #     "ylabel": "BLEU",
     #     "xticks": list(range(1, 6, 1)),
     #     "scalar_name": "valid/matthews_correlation",
-    #     "plot_name_func": rosa_vs_lora_plot_name_func,
+    #     "plot_name_func": default_name_func,
     #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
     #         s.split("_name")[1].split("_")[0]],
     #     # "plot_marker_func": lambda s: random.choice(markers),
@@ -138,7 +139,7 @@ experiments = {
     #     "ylabel": "BLEU",
     #     "xticks": list(range(1, 6, 1)),
     #     "scalar_name": "valid/accuracy",
-    #     "plot_name_func": rosa_vs_lora_plot_name_func,
+    #     "plot_name_func": default_name_func,
     #     "plot_marker_func": lambda s: {"rosa": "o-", "lora": "x--", "none": "s-", "ia3": "s--"}[
     #         s.split("_name")[1].split("_")[0]],
     #     # "plot_marker_func": lambda s: random.choice(markers),
@@ -189,7 +190,7 @@ def main(dir_path, output_dir="outputs"):
         os.makedirs(output_dir)
     dataset = osp.basename(dir_path)
 
-    epochs_constraint = 5
+    min_epochs_constraint = 5
 
     for exp_name, exp_config in experiments.items():
         print("\nExperiment: {} (scalar: {})\n ".format(exp_name, exp_config['scalar_name']))
@@ -201,7 +202,7 @@ def main(dir_path, output_dir="outputs"):
                 exp_path = os.path.join(dir_path, filename)
                 x, y = aggregate_scalar(exp_path, scalar_name=exp_config['scalar_name'])
                 # print("\t\tx: {}, y: {}".format(x, y))
-                if len(x) >= epochs_constraint:
+                if len(x) >= min_epochs_constraint:
                     plt.plot(
                         x, y,
                         exp_config['plot_marker_func'](filename),
@@ -239,29 +240,78 @@ def main(dir_path, output_dir="outputs"):
         output_filename = osp.join(output_dir, f"{exp_name}_{dataset}.png")
         plt.savefig(output_filename, dpi=300)
 
+    # # Tables
+    # best_func = max
+    # # e10_l0.0002_b32_f1.0_s512_nadamw_be0.9_0.98_ep1e-08_w0.1_nalinear_wa0.06_namroberta-base_namelora_fa1_facepoch_iTrue_r8_leepoch_factrandom_factoequal_uFalse_t0
+    # for exp_name, exp_config in experiments.items():
+    #     dct = {'name': [], "trainable_params": [], exp_config['scalar_name']: []}
+    #     for filename in os.listdir(dir_path):
+    #         if match_string(filename, exp_config['regex']):
+    #             exp_path = os.path.join(dir_path, filename)
+    #             x, y = aggregate_scalar(exp_path, scalar_name=exp_config['scalar_name'])
+    #             _, t = aggregate_scalar(exp_path, scalar_name="train/trainable_params")
+    #             # print("\tx: {}, y: {}".format(x, y))
+    #             if len(x) >= min_epochs_constraint:
+    #                 dct['name'].append(exp_config['plot_name_func'](filename))
+    #                 dct[exp_config['scalar_name']].append(best_func(y))
+    #                 dct["trainable_params"].append(max(t))
+
     # Tables
     best_func = max
     for exp_name, exp_config in experiments.items():
-        dct = {'name': [], "trainable_params": [], exp_config['scalar_name']: []}
+        rows = {}
         for filename in os.listdir(dir_path):
             if match_string(filename, exp_config['regex']):
                 exp_path = os.path.join(dir_path, filename)
                 x, y = aggregate_scalar(exp_path, scalar_name=exp_config['scalar_name'])
                 _, t = aggregate_scalar(exp_path, scalar_name="train/trainable_params")
                 # print("\tx: {}, y: {}".format(x, y))
-                if len(x) >= epochs_constraint:
-                    dct['name'].append(exp_config['plot_name_func'](filename))
-                    dct[exp_config['scalar_name']].append(best_func(y))
-                    dct["trainable_params"].append(max(t))
+                if len(x) >= min_epochs_constraint:
 
-        print("\nExperiment: {}\n ".format(exp_name))
-        df = pd.DataFrame(dct)
+                    nme = filename.split("_t")[0]  # aggregate trial
+                    if nme not in rows:
+                        rows[nme] = {
+                            "name": exp_config['plot_name_func'](filename),
+                            "trainable_params": max(t),
+                            exp_config['scalar_name']: [best_func(y)],
+                            "num_runs": 1
+                        }
+                    else:
+                        rows[nme][exp_config['scalar_name']].append(best_func(y))
+                        rows[nme]["trainable_params"] = max(t)
+                        rows[nme]["num_runs"] += 1
+
+        # Compute mean and std
+        for nme, dct in rows.items():
+            dct[exp_config['scalar_name'] + " (median)"] = np.median(dct[exp_config['scalar_name']])
+            dct[exp_config['scalar_name'] + " (std)"] = np.std(dct[exp_config['scalar_name']])
+
+        # Transform to dataframe
+        output_dct = {
+            "name": [],
+            "trainable_params": [],
+            exp_config['scalar_name'] + " (median)": [],
+            exp_config['scalar_name'] + " (std)": [],
+            "num_runs": []
+        }
+
+        for nme, dct in rows.items():
+            output_dct['name'].append(dct['name'])
+            output_dct['trainable_params'].append(dct['trainable_params'])
+            output_dct[exp_config['scalar_name'] + " (median)"].append(dct[exp_config['scalar_name'] + " (median)"])
+            output_dct[exp_config['scalar_name'] + " (std)"].append(dct[exp_config['scalar_name'] + " (std)"])
+            output_dct["num_runs"].append(dct["num_runs"])
+
+        df = pd.DataFrame(output_dct)
         df['trainable_params'] = df['trainable_params'].map(lambda x: x / 1e6)
         df = df.sort_values(by=['name'], ascending=True)
         df['trainable_params'] = df['trainable_params'].round(3)
-        df[exp_config['scalar_name']] = df[exp_config['scalar_name']].round(3)
+        df[exp_config['scalar_name'] + " (median)"] = df[exp_config['scalar_name'] + " (median)"].round(3)
+        df[exp_config['scalar_name'] + " (std)"] = df[exp_config['scalar_name'] + " (std)"].round(3)
         df = df.applymap(lambda x: f"{x:.2f}".rstrip('0').rstrip('.') if isinstance(x, float) else x)
         latex_table = df.to_latex(index=False)
+
+        print("\nExperiment: {}\n ".format(exp_name))
         print("{}\n".format(latex_table))
 
 

@@ -1,4 +1,5 @@
 from typing import Union
+import logging
 
 import torch
 import torch.nn as nn
@@ -15,7 +16,8 @@ class PeftLinear(nn.Module):
             alpha: float = 32.0,
             factorize_mode: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
-            init_method: str = 'zero'  # 'zero', 'random'
+            init_method: str = 'zero',  # 'zero', 'random'
+            debug: bool = False,
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
 
@@ -29,6 +31,7 @@ class PeftLinear(nn.Module):
             factorize_mode: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
             init_method: initialization method for `a` [`zero`, `random`]
+            debug: whether to use debug mode
 
         Notes:
             - Initialized with random weights and `merged` flag set to False
@@ -58,11 +61,16 @@ class PeftLinear(nn.Module):
         self.factorize_mode = factorize_mode
         self.factorize_method = factorize_method
         self.init_method = init_method
+        self.debug = debug
         self.a = nn.Parameter(torch.zeros(in_features, self.rank)) if self.init_method == 'zero' else \
             nn.Parameter(torch.randn(in_features, self.rank))
         self.b = nn.Parameter(torch.randn(self.rank, out_features))
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
+
+        # if self.debug:
+        #     logging.warning("Debug mode is on. This will consume a lot of memory. ")
+
 
     def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
                            bias_init: torch.Tensor = None):
@@ -218,6 +226,13 @@ class PeftLinear(nn.Module):
         if self.merged.item():
             # [*, in_features] @ [in_features, out_features] + [out_features, 1] = [*, out_features]
             return x @ self.w + self.bias.reshape(-1) if self.bias is not None else x @ self.w
+        elif self.debug:
+            # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
+            a = (self.alpha / self.rank) * self.a if self.use_scale else self.a
+            self.ab = a @ self.b
+            self.ab.retain_grad()
+            return (x @ self.ab) + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
+                else (x @ self.ab) + x @ self.w
         else:
             # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
             a = (self.alpha/self.rank) * self.a if self.use_scale else self.a
