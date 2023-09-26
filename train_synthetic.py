@@ -112,7 +112,7 @@ def main(cfg: DictConfig):
     # Set seeds
     set_seeds(42)
 
-    models = {"linear": LinearModel, "mlp2": MLP2Layer, "mlp4": MLP4Layer}
+    models = {"linear": LinearModel, "mlp2": MLP2Layer}
     init_model = models[model_name](in_features=in_f, out_features=out_f, bias=False)
     true_model = pn.LoraNet(copy.deepcopy(init_model), rank=true_rank, init_method="random")
     x_train, y_train = build_synthetic_dataset(true_model, n_samples=n_train_samples, n_dims=in_f)
