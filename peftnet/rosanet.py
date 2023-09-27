@@ -1,4 +1,5 @@
 from typing import Union
+import logging
 
 import torch.nn as nn
 
@@ -18,6 +19,7 @@ class RosaNet(PEFTNet):
             factorize_method: str = 'equal',  # 'equal', 'add'
             bias_requires_grad: bool = True,
             debug: bool = False,
+            fast_mode: bool = False,
             *args, **kwargs
     ):
         """ ROSA PEFT model for efficient adaptation of linear layers
@@ -31,6 +33,7 @@ class RosaNet(PEFTNet):
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
             bias_requires_grad: whether to make bias trainable
             debug: whether to use debug mode
+            fast_mode: whether to use fast mode (no checks)
 
         Notes:
             - only modules types in `factorize_list` will be factorized
@@ -49,7 +52,18 @@ class RosaNet(PEFTNet):
                 factorize_method=factorize_method,
                 bias_requires_grad=bias_requires_grad,
                 debug=debug,
+                fast_mode=fast_mode
             ),
+        )
+
+        logging.info(f'Initialized ROSA model with params:')
+        logging.info(
+            f'rank: {rank}, '
+             f'factorize_mode: {factorize_mode}, '
+             f'factorize_method: {factorize_method}, '
+             f'bias_requires_grad: {bias_requires_grad} '
+             f'debug: {debug}, '
+             f'fast_mode: {fast_mode}'
         )
 
         # ROSA Model initializes low rank matrices with values obtained from SVD

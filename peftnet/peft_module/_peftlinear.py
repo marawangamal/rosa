@@ -19,6 +19,7 @@ class PeftLinear(nn.Module):
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
             debug: bool = False,
+            fast_mode: bool = False,
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
 
@@ -63,6 +64,7 @@ class PeftLinear(nn.Module):
         self.factorize_method = factorize_method
         self.init_method = init_method
         self.debug = debug
+        self.fast_mode = fast_mode
         self.a = nn.Parameter(torch.zeros(in_features, self.rank)) if self.init_method == 'zero' else \
             nn.Parameter(torch.randn(in_features, self.rank))
         self.b = nn.Parameter(torch.randn(self.rank, out_features))
@@ -138,7 +140,8 @@ class PeftLinear(nn.Module):
         w_hat = a @ b
 
         # Check reconstruction error
-        assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
+        if not self.fast_mode:
+            assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
         trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.factorize_mode)
 
         # Set trainable and fixed parameters
@@ -227,15 +230,27 @@ class PeftLinear(nn.Module):
         if self.merged.item():
             # [*, in_features] @ [in_features, out_features] + [out_features, 1] = [*, out_features]
             return x @ self.w + self.bias.reshape(-1) if self.bias is not None else x @ self.w
-        elif self.debug:  # retain intermediate gradient (for plotting purposes)
-            # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
-            a = (self.alpha / self.rank) * self.a if self.use_scale else self.a
-            self.ab = a @ self.b
-            self.ab.retain_grad()
-            return (x @ self.ab) + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
-                else (x @ self.ab) + x @ self.w
+        # elif self.debug:  # retain intermediate gradient (for plotting purposes)
+        #     # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
+        #     a = (self.alpha / self.rank) * self.a if self.use_scale else self.a
+        #     self.ab = a @ self.b
+        #     self.ab.retain_grad()
+        #     return (x @ self.ab) + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
+        #         else (x @ self.ab) + x @ self.w
         else:
             # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
             a = (self.alpha/self.rank) * self.a if self.use_scale else self.a
             return (x @ a) @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
                 else (x @ a) @ self.b + x @ self.w
+
+
+
+# [2023-09-27 19:00:42,795][root][INFO] - [Epoch    2 Step  100/ 268] | loss  0.34 | trainable: 294,912 | lr: 0.001396
+# [2023-09-27 19:00:42,796][root][INFO] - Latency Report:  | forward  241 ms | loss.mean()  242 ms | loss.backward()  526 ms | optimizer.step()  529 ms
+# [2023-09-27 19:00:42,796][root][INFO] - Memory Report: [train_epoch] Initial  607 MB | [train_epoch] After model to device  607 MB | [train_epoch] After batch to device  610 MB | [train_epoch] After forward 17617 MB | [train_epoch] After loss.backward()  611 MB | [train_epoch] After optimizer.step()  611 MB | [train_epoch] After optimizer.zero_grad()  610 MB
+
+
+#
+# [Epoch    4 Step  400/ 535] | loss  0.03 | trainable: 124,647,170 | lr: 0.000001
+# Latency Report:  | forward   80 ms | loss.mean()   81 ms | loss.backward()  207 ms | optimizer.step()  217 ms
+# Memory Report: [train_epoch] Initial 1510 MB | [train_epoch] After model to device 1510 MB | [train_epoch] After batch to device 1510 MB | [train_epoch] After forward 6494 MB | [train_epoch] After loss.backward() 1988 MB | [train_epoch] After optimizer.step() 1988 MB | [train_epoch] After optimizer.zero_grad() 1510 MB

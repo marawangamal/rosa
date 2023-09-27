@@ -1,4 +1,5 @@
 from typing import Union
+import logging
 
 import torch.nn as nn
 
@@ -17,6 +18,7 @@ class LoraNet(PEFTNet):
             init_method: str = "zero",
             bias_requires_grad: bool = True,
             debug: bool = False,
+            fast_mode: bool = False,
             *args, **kwargs
     ):
         """ LoRa PEFT model for efficient adaptation of linear layers
@@ -43,6 +45,15 @@ class LoraNet(PEFTNet):
                 use_scale=use_scale,
                 init_method=init_method,
                 bias_requires_grad=bias_requires_grad,
-                debug=debug
+                debug=debug,
+                fast_mode=fast_mode
             ),
+        )
+
+        logging.info(f'Initialized LoRA model with params:')
+        logging.info(
+            f'rank: {rank}, '
+             f'bias_requires_grad: {bias_requires_grad} '
+             f'debug: {debug}, '
+             f'fast_mode: {fast_mode}'
         )
