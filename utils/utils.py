@@ -283,7 +283,7 @@ task_to_keys = {
     "wnli": ("sentence1", "sentence2"),
     "axb": ("sentence1", "sentence2"),
     "axg": ("premise", "hypothesis"),
-    "boolq": ("question", "passage"),
+    "boolq": ("passage", "question"),
     "cb": ("premise", "hypothesis"),
     "copa": ("premise", "choice1", "choice2", "question"),  # TODO: figure out how to set this up
     "multirc": ("paragraph", "question", "answer"),  # TODO: figure out how to set this up
@@ -293,21 +293,35 @@ task_to_keys = {
 }
 
 
-def preprocess_function_mlm(examples, tokenizer, task_name="cola", max_length=512):
+def preprocess_function_mlm(example, tokenizer, task_name="cola", max_length=512):
     # tokenize the texts according to the keys for each glue task
     text_keys = task_to_keys[task_name]
 
+    if task_name == "wic":
+        # take word spans (start1, start2, end1, end2)
+        # and surround those words in the sentences with
+        # special tokens
+        # then tokenize the sentences
+        sentence1 = example["sentence1"]
+        sentence2 = example["sentence2"]
+
+        start1, start2, end1, end2 = example["start1"], example["start2"], example["end1"], example["end2"]
+
+        sentence1 = sentence1[:start1] + "<t>" + sentence1[start1:end1] + "</t>" + sentence1[end1:]
+        sentence2 = sentence2[:start2] + "<t>" + sentence2[start2:end2] + "</t>" + sentence2[end2:]
+
+        output = tokenizer(sentence1, sentence2, max_length=max_length, truncation=True, padding="max_length")
     # tokenize the texts, passing two arguments to the tokenizer
     # if the task has two inputs. otherwise just one
-    if text_keys[1] is not None:
+    elif text_keys[1] is not None:
         # pad to max length
-        output = tokenizer(examples[text_keys[0]], examples[text_keys[1]], max_length=max_length, truncation=True,
+        output = tokenizer(example[text_keys[0]], example[text_keys[1]], max_length=max_length, truncation=True,
                            padding="max_length")
     else:
-        output = tokenizer(examples[text_keys[0]], max_length=max_length, truncation=True, padding="max_length")
+        output = tokenizer(example[text_keys[0]], max_length=max_length, truncation=True, padding="max_length")
 
     # output["labels"] is just "label" for mlm task
-    output["labels"] = examples["label"]
+    output["labels"] = example["label"]
 
     return output
 
