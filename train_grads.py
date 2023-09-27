@@ -16,9 +16,16 @@ from peftnet.peft_module.loralinear import LoraLinear
 class LinearModel(nn.Module):
     """A simple linear model."""
 
-    def __init__(self, in_features=768, out_features=32, bias=False):
+    def __init__(self, in_features=768, out_features=32, bias=False, sigma=1):
         super().__init__()
         self.l1 = nn.Linear(in_features, out_features, bias=bias)
+        self.init_weights(sigma)
+
+    def init_weights(self, sigma):
+        for layer in [self.l1]:
+            torch.nn.init.normal_(layer.weight, mean=0, std=sigma)
+            if layer.bias is not None:
+                torch.nn.init.normal_(layer.bias, mean=0, std=sigma)
 
     def forward(self, x):
         """ Forward pass.
@@ -36,10 +43,17 @@ class LinearModel(nn.Module):
 class MLP2Layer(nn.Module):
     """A 2-layer multi-layer perceptron."""
 
-    def __init__(self, in_features=768, out_features=32, hidden=64, bias=False):
+    def __init__(self, in_features=768, out_features=32, hidden=64, bias=False, sigma=1):
         super().__init__()
         self.l1 = nn.Linear(in_features, hidden, bias=bias)
         self.l2 = nn.Linear(hidden, out_features, bias=bias)
+        self.init_weights(sigma)
+
+    def init_weights(self, sigma):
+        for layer in [self.l1, self.l2]:
+            torch.nn.init.normal_(layer.weight, mean=0, std=sigma)
+            if layer.bias is not None:
+                torch.nn.init.normal_(layer.bias, mean=0, std=sigma)
 
     def forward(self, x):
         """ Forward pass.
@@ -54,10 +68,44 @@ class MLP2Layer(nn.Module):
         return self.l2(nn.functional.relu(self.l1(x)))
 
 
-def build_synthetic_dataset(model, n_samples=1000, n_dims=768):
+class MLP4Layer(nn.Module):
+    """A 4-layer multi-layer perceptron."""
+
+    def __init__(self, in_features=768, out_features=32, hidden=64, bias=False, sigma=1):
+        super().__init__()
+        self.l1 = nn.Linear(in_features, hidden, bias=bias)
+        self.l2 = nn.Linear(hidden, hidden, bias=bias)
+        self.l3 = nn.Linear(hidden, hidden, bias=bias)
+        self.l4 = nn.Linear(hidden, out_features, bias=bias)
+        self.init_weights(sigma)
+
+    def init_weights(self, sigma):
+        for layer in [self.l1, self.l2, self.l3, self.l4]:
+            torch.nn.init.normal_(layer.weight, mean=0, std=sigma)
+            if layer.bias is not None:
+                torch.nn.init.normal_(layer.bias, mean=0, std=sigma)
+
+    def forward(self, x):
+        """ Forward pass.
+
+        Args:
+            x: [batch_size, in_features]
+
+        Returns:
+            y: [batch_size, out_features]
+
+        """
+
+        # rlu = nn.functional.relu
+        return self.l4(self.l3(self.l2(self.l1(x))))
+        # return self.l4(rlu(self.l3(rlu(self.l2(rlu(self.l1(x)))))))
+
+
+def build_synthetic_dataset(model, n_samples=1000, n_dims=768, sigma=1):
     """Build a synthetic dataset from a given model."""
     with torch.no_grad():
-        x = torch.randn(n_samples, n_dims)
+        # x = torch.randn(n_samples, n_dims)
+        x = torch.normal(0, sigma, size=(n_samples, n_dims))
         y = model(x)
         return x, y
 
@@ -78,17 +126,19 @@ def main():
     # *** Configure HPs ***
 
     # Experiment parameters
-    n_trials = 10
+    n_trials = 1
     n_grad_pts_in_plot = 20  # number of points to plot in the gradient plot
 
     # Baseline model parameters
-    model_name = "mlp2"
+    model_name = "mlp4"
     true_rank = 24
-    in_f = 512
+    in_f = 32
     out_f = 32
+    sigma_weights = 0.5
 
     # Dataset parameters
     n_train_samples = 5000
+    sigma_data = 0.1
 
     # Train parameters
     bs = 64
@@ -101,10 +151,10 @@ def main():
     # Set seeds
     set_seeds(42)
 
-    models = {"linear": LinearModel, "mlp2": MLP2Layer}
-    init_model = models[model_name](in_features=in_f, out_features=out_f, bias=False)
+    models = {"linear": LinearModel, "mlp2": MLP2Layer, "mlp4": MLP4Layer}
+    init_model = models[model_name](in_features=in_f, out_features=out_f, bias=False, sigma=sigma_weights)
     true_model = pn.LoraNet(copy.deepcopy(init_model), rank=true_rank, init_method="random")
-    x_train, y_train = build_synthetic_dataset(true_model, n_samples=n_train_samples, n_dims=in_f)
+    x_train, y_train = build_synthetic_dataset(true_model, n_samples=n_train_samples, n_dims=in_f, sigma=sigma_data)
 
     # Dataloader
     train_dataset = torch.utils.data.TensorDataset(x_train, y_train)
@@ -140,6 +190,7 @@ def main():
                 for layername, module in model.named_modules():
                     if layername in layers_of_interest:
                         print(f"{name}: {layername} grad: {module.ab.grad.flatten()[:5]}")
+                        print(f"{name}: {layername} weight: {module.ab.flatten()[:5]}")
                         layer_grads[name][layername].append(module.ab.grad.flatten()[:n_grad_pts_in_plot])
             else:
                 raise NotImplementedError
@@ -165,7 +216,7 @@ def main():
                 grads_mean,
                 yerr=grads_std,
                 fmt="-." if name == "lora" else "--x",
-                facecolors='none',
+                # facecolors='none',
                 label=f"{name}_{layername}",
                 color=layernames2colors[layername]
             )

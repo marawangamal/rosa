@@ -30,6 +30,7 @@ fnmodel:
     factorize_mode: random  # ["random", "top", "bottom"]
     factorize_method: equal # ["equal", "add"]  (w \gets usv1 + usv2  vs.  w \gets w + usv2)
     use_scale: False  # scale factorization by rank
+    bias_requires_grad: True  # whether to optimize bias
 logging:
   print_freq: 100
   eval_freq: 100  # log every n batches

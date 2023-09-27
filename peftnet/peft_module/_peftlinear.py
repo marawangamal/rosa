@@ -17,6 +17,7 @@ class PeftLinear(nn.Module):
             factorize_mode: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
             init_method: str = 'zero',  # 'zero', 'random'
+            bias_requires_grad: bool = True,
             debug: bool = False,
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
@@ -55,7 +56,7 @@ class PeftLinear(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.rank = self._integer_rank(rank, full_rank=min(in_features, out_features))
-        self.bias = nn.Parameter(torch.zeros(out_features)) if bias else None
+        self.bias = nn.Parameter(torch.zeros(out_features), requires_grad=bias_requires_grad) if bias else None
         self.use_scale = use_scale
         self.alpha = alpha
         self.factorize_mode = factorize_mode
@@ -226,7 +227,7 @@ class PeftLinear(nn.Module):
         if self.merged.item():
             # [*, in_features] @ [in_features, out_features] + [out_features, 1] = [*, out_features]
             return x @ self.w + self.bias.reshape(-1) if self.bias is not None else x @ self.w
-        elif self.debug:
+        elif self.debug:  # retain intermediate gradient (for plotting purposes)
             # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
             a = (self.alpha / self.rank) * self.a if self.use_scale else self.a
             self.ab = a @ self.b

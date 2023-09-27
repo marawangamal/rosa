@@ -16,6 +16,7 @@ class RosaNet(PEFTNet):
             factorize_list: list = None,
             factorize_mode: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
+            bias_requires_grad: bool = True,
             debug: bool = False,
             *args, **kwargs
     ):
@@ -28,6 +29,7 @@ class RosaNet(PEFTNet):
             factorize_list: names of modules types to replace
             factorize_mode: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
+            bias_requires_grad: whether to make bias trainable
             debug: whether to use debug mode
 
         Notes:
@@ -41,8 +43,12 @@ class RosaNet(PEFTNet):
             factorize_list=factorize_list,
             replacement_module=RosaLinear,
             replacement_kwargs=dict(
-                rank=rank, use_scale=use_scale, factorize_mode=factorize_mode, factorize_method=factorize_method,
-                debug=debug
+                rank=rank,
+                use_scale=use_scale,
+                factorize_mode=factorize_mode,
+                factorize_method=factorize_method,
+                bias_requires_grad=bias_requires_grad,
+                debug=debug,
             ),
         )
 

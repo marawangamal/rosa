@@ -15,6 +15,7 @@ class LoraNet(PEFTNet):
             ignore_list: list = None,
             factorize_list: list = None,
             init_method: str = "zero",
+            bias_requires_grad: bool = True,
             debug: bool = False,
             *args, **kwargs
     ):
@@ -34,8 +35,14 @@ class LoraNet(PEFTNet):
         """
         super().__init__(
             model,
-            ignore_list,
-            factorize_list,
+            ignore_list=ignore_list,
+            factorize_list=factorize_list,
             replacement_module=LoraLinear,
-            replacement_kwargs=dict(rank=rank, use_scale=use_scale, init_method=init_method, debug=debug),
+            replacement_kwargs=dict(
+                rank=rank,
+                use_scale=use_scale,
+                init_method=init_method,
+                bias_requires_grad=bias_requires_grad,
+                debug=debug
+            ),
         )
