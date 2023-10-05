@@ -166,11 +166,11 @@ def evaluate(model, device, eval_dataloader, task="cola"):
 def factorize(args, model, lr_scheduler, optimizer, steps_counter, num_training_steps):
     # Mask gradients
     with torch.no_grad():
-        logging.info("\n=> *** Factorizing model at step {} with factorize level {} ***\n".format(
+        logging.info("\n=> *** Factorizing (fact on!) model at step {} with factorize level {} ***\n".format(
                 steps_counter, args['fnmodel']['factorize_level']
             )
         )
-        model = model.module.factorize() if isinstance(model, nn.DataParallel) else model.factorize()
+        # model = model.module.factorize() if isinstance(model, nn.DataParallel) else model.factorize()
 
         # New optimizer
         opt_cls = optimizer.__class__
@@ -300,7 +300,7 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
         steps_counter += 1
 
     model_fn = model.module if isinstance(model, nn.DataParallel) else model
-    if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
+    if isinstance(model_fn, pn.RosaNetDebug) or isinstance(model_fn, pn.LoraNet):
         df = model_fn.get_report()
         logging.info("\n{}".format(df))
         logging.info(model_fn)
@@ -315,20 +315,9 @@ def train_epoch(args, model, device, train_dataloader, optimizer, lr_scheduler, 
     return {"loss": loss_average_meter.value}, optimizer, steps_counter
 
 
-def train(
-        args,
-        cmodel,
-        optimizer,
-        lr_scheduler,
-        train_dataloader,
-        valid_dataloader,
-        device, output_path,
-        writer,
-        curr_epoch=1,
-        best_valid_metrics=None,
-        cuda_memory_tracker=None,
-        test_dataloader=None,
-):
+def train(args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device, output_path,
+          tokenizer, writer, curr_epoch=1, best_valid_metrics=None,
+          cuda_memory_tracker=None, test_dataloader=None, test_dataset=None):
     # Get runtime metrics
     cuda_memory_tracker = CudaMemoryTracker() if cuda_memory_tracker is None else cuda_memory_tracker
 
@@ -347,8 +336,9 @@ def train(
         # whatever you are timing goes here
 
         # Mask gradients of RosaNet
+        # import pdb; pdb.set_trace()
         if args['fnmodel']['name'] == "rosa" and args['fnmodel']['factorize_level'] == "epoch" and \
-                (i_epoch == 0 or i_epoch % args['fnmodel']['factorize_freq'] == 0):
+                i_epoch > 0 and i_epoch % args['fnmodel']['factorize_freq'] == 0:
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
             cmodel, optimizer, lr_scheduler = factorize(
                 args, cmodel, lr_scheduler, optimizer, steps_counter, num_training_steps
@@ -583,14 +573,14 @@ def main(cfg: DictConfig):
         logging.info("=> Using {} model ...".format(args['fnmodel']['name'].lower()))
         ignore_list = get_ignore_list_glue(model) if args['fnmodel']['ignore_list'] else None
         cmodel = {
-            "rosa": pn.RosaNet,
+            "rosa": pn.RosaNetDebug,
             "lora": pn.LoraNet,
             "ia3": pn.IA3Net,
             "none": lambda x, **kwargs: x
         }[args['fnmodel']['name'].lower()](model, ignore_list=ignore_list, **args['fnmodel']['params'])
         logging.info("Factorized Model:\n{}".format(cmodel))
         model_fn = model.module if isinstance(model, nn.DataParallel) else model
-        if isinstance(model_fn, pn.RosaNet) or isinstance(model_fn, pn.LoraNet):
+        if isinstance(model_fn, pn.RosaNetDebug) or isinstance(model_fn, pn.LoraNet):
             df = model_fn.get_report()
             logging.info("\n{}".format(df))
             logging.info(model_fn)
@@ -676,19 +666,10 @@ def main(cfg: DictConfig):
         # Training
         logging.info(cuda_memory_tracker.report())
         train(
-            args=args,
-            cmodel=cmodel,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            train_dataloader=train_dataloader,
-            valid_dataloader=valid_dataloader,
-            device=device,
-            output_path=output_path,
-            writer=writer,
-            curr_epoch=curr_epoch,
-            best_valid_metrics=curr_best_valid_metrics,
+            args, cmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloader, device,
+            output_path, tokenizer, writer, curr_epoch=curr_epoch, best_valid_metrics=curr_best_valid_metrics,
             cuda_memory_tracker=cuda_memory_tracker,
-            test_dataloader=None,
+            test_dataloader=None, test_dataset=test_dataset
         )
 
         print("=> Experiment: `{}` Succeeded".format(folder_name))

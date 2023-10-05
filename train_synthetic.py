@@ -137,7 +137,8 @@ def main(cfg: DictConfig):
             **{
                 "ROSA (r={}):".format(max(r, 1)): pn.RosaNet(copy.deepcopy(init_model), rank=max(r, 1))
                 for r in range(0, peft_rank_max+1, peft_rank_step)
-              }
+              },
+            "FT": copy.deepcopy(init_model)
         }
         def color_and_marker_func(name):
             rank_colors = {
@@ -145,8 +146,8 @@ def main(cfg: DictConfig):
                 enumerate(range(0, peft_rank_max + 1, peft_rank_step))
             }
             rank = int(name.split('=')[-1][:-2])
-            color = rank_colors[rank]
-            marker = {"LoRA": "--", "ROSA": "-"}[name.split(" ")[0]]
+            color = rank_colors[rank] if "FT" not in name else "black"
+            marker = {"LoRA": "--", "ROSA": "-", "FT": "-"}[name.split(" ")[0]]
             return color, marker
 
 
@@ -235,3 +236,4 @@ if __name__ == '__main__':
 
     # 2-layer
     # python train_synthetic.py model.name=mlp2 exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=1000
+    # python train_synthetic.py data.out_f=10 model.name=mlp2 exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=1000
