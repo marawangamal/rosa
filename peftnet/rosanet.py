@@ -15,7 +15,7 @@ class RosaNet(PEFTNet):
             use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
-            factorize_mode: str = 'random',
+            sample_method: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
             bias_requires_grad: bool = True,
             debug: bool = False,
@@ -29,7 +29,7 @@ class RosaNet(PEFTNet):
             rank: rank of factorized matrices
             ignore_list: names of layers to ignore
             factorize_list: names of modules types to replace
-            factorize_mode: factorize mode [`random`, `top`, `bottom`]
+            sample_method: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
             bias_requires_grad: whether to make bias trainable
             debug: whether to use debug mode
@@ -48,7 +48,7 @@ class RosaNet(PEFTNet):
             replacement_kwargs=dict(
                 rank=rank,
                 use_scale=use_scale,
-                factorize_mode=factorize_mode,
+                sample_method=sample_method,
                 factorize_method=factorize_method,
                 bias_requires_grad=bias_requires_grad,
                 debug=debug,
@@ -59,7 +59,7 @@ class RosaNet(PEFTNet):
         logging.info(f'Initialized ROSA model with params:')
         logging.info(
             f'rank: {rank}, '
-             f'factorize_mode: {factorize_mode}, '
+             f'sample_method: {sample_method}, '
              f'factorize_method: {factorize_method}, '
              f'bias_requires_grad: {bias_requires_grad} '
              f'debug: {debug}, '
@@ -78,7 +78,7 @@ class RosaNetDebug(PEFTNetDebug):
             use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
-            factorize_mode: str = 'random',
+            sample_method: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
             bias_requires_grad: bool = True,
             debug: bool = False,
@@ -92,7 +92,7 @@ class RosaNetDebug(PEFTNetDebug):
             rank: rank of factorized matrices
             ignore_list: names of layers to ignore
             factorize_list: names of modules types to replace
-            factorize_mode: factorize mode [`random`, `top`, `bottom`]
+            sample_method: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
             bias_requires_grad: whether to make bias trainable
             debug: whether to use debug mode
@@ -111,7 +111,7 @@ class RosaNetDebug(PEFTNetDebug):
             replacement_kwargs=dict(
                 rank=rank,
                 use_scale=use_scale,
-                factorize_mode=factorize_mode,
+                sample_method=sample_method,
                 factorize_method=factorize_method,
                 bias_requires_grad=bias_requires_grad,
                 debug=debug,
@@ -122,7 +122,7 @@ class RosaNetDebug(PEFTNetDebug):
         logging.info(f'Initialized ROSA model with params:')
         logging.info(
             f'rank: {rank}, '
-             f'factorize_mode: {factorize_mode}, '
+             f'sample_method: {sample_method}, '
              f'factorize_method: {factorize_method}, '
              f'bias_requires_grad: {bias_requires_grad} '
              f'debug: {debug}, '

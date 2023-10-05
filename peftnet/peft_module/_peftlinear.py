@@ -14,7 +14,8 @@ class PeftLinear(nn.Module):
             bias: bool = False,
             use_scale: bool = False,
             alpha: float = 32.0,
-            factorize_mode: str = 'random',
+            adapt_method: str = 'ab',  # 'ab', 'a', 'b'
+            sample_method: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
@@ -30,7 +31,8 @@ class PeftLinear(nn.Module):
             bias: whether to include bias
             use_scale: whether to use scale factor
             alpha: scale factor
-            factorize_mode: factorize mode [`random`, `top`, `bottom`]
+            adapt_method: which parameters to adapt [`ab`, `a`, `b`] (default: `ab`)
+            sample_method: sample method [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
             init_method: initialization method for `a` [`zero`, `random`]
             debug: whether to use debug mode
@@ -50,9 +52,10 @@ class PeftLinear(nn.Module):
         assert isinstance(use_scale, bool), "use_scale must be a boolean"
         assert isinstance(alpha, (int, float)), "alpha must be an integer or a float"
         assert factorize_method in ['equal', 'add'], "factorize_method must be one of ['equal', 'add']"
-        assert factorize_mode in ['random', 'top', 'bottom'], \
-            "factorize_mode must be one of ['random', 'top', 'bottom']"
+        assert sample_method in ['random', 'top', 'bottom'], \
+            "sample_method must be one of ['random', 'top', 'bottom']"
         assert init_method in ['zero', 'random'], "init_method must be one of ['zero', 'random']"
+        assert adapt_method in ['ab', 'a', 'b'], "adapt_method must be one of ['ab', 'a', 'b']"
 
         self.in_features = in_features
         self.out_features = out_features
@@ -60,19 +63,22 @@ class PeftLinear(nn.Module):
         self.bias = nn.Parameter(torch.zeros(out_features), requires_grad=bias_requires_grad) if bias else None
         self.use_scale = use_scale
         self.alpha = alpha
-        self.factorize_mode = factorize_mode
+        self.adapt_method = adapt_method
+        self.sample_method = sample_method
         self.factorize_method = factorize_method
         self.init_method = init_method
         self.debug = debug
         self.fast_mode = fast_mode
-        self.a = nn.Parameter(torch.zeros(in_features, self.rank)) if self.init_method == 'zero' else \
-            nn.Parameter(torch.randn(in_features, self.rank))
-        self.b = nn.Parameter(torch.randn(self.rank, out_features))
+
+        # Set requires_grad for a and b
+        requires_grad_a = True if self.adapt_method in ['ab', 'a'] else False
+        requires_grad_b = True if self.adapt_method in ['ab', 'b'] else False
+
+        a_init_func = torch.zeros if self.init_method == 'zero' else torch.randn
+        self.a = nn.Parameter(a_init_func(in_features, self.rank), requires_grad=requires_grad_a)
+        self.b = nn.Parameter(torch.randn(self.rank, out_features), requires_grad=requires_grad_b)
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
-
-        # if self.debug:
-        #     logging.warning("Debug mode is on. This will consume a lot of memory. ")
 
 
     def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
@@ -159,7 +165,7 @@ class PeftLinear(nn.Module):
             # Check reconstruction error
             if not self.fast_mode:
                 assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
-            trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.factorize_mode)
+            trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.sample_method)
 
             # Set trainable and fixed parameters
             init_a_trainable = a[:, trainable_indices]  # [in_f, r']
@@ -265,6 +271,7 @@ class PeftLinear(nn.Module):
             return (x @ a) @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
                 else (x @ a) @ self.b + x @ self.w
 
+
 class PeftLinearDebug(nn.Module):
     def __init__(
             self,
@@ -274,7 +281,8 @@ class PeftLinearDebug(nn.Module):
             bias: bool = False,
             use_scale: bool = False,
             alpha: float = 32.0,
-            factorize_mode: str = 'random',
+            sample_method: str = 'random',
+            adapt_method: str = 'ab',  # 'ab', 'a', 'b'
             factorize_method: str = 'equal',  # 'equal', 'add', 'random'
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
@@ -290,7 +298,8 @@ class PeftLinearDebug(nn.Module):
             bias: whether to include bias
             use_scale: whether to use scale factor
             alpha: scale factor
-            factorize_mode: factorize mode [`random`, `top`, `bottom`]
+            adapt_method: which parameters to adapt [`ab`, `a`, `b`] (default: `ab`)
+            sample_method: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
             init_method: initialization method for `a` [`zero`, `random`]
             debug: whether to use debug mode
@@ -310,9 +319,10 @@ class PeftLinearDebug(nn.Module):
         assert isinstance(use_scale, bool), "use_scale must be a boolean"
         assert isinstance(alpha, (int, float)), "alpha must be an integer or a float"
         assert factorize_method in ['equal', 'add'], "factorize_method must be one of ['equal', 'add']"
-        assert factorize_mode in ['random', 'top', 'bottom'], \
-            "factorize_mode must be one of ['random', 'top', 'bottom']"
+        assert sample_method in ['random', 'top', 'bottom'], \
+            "sample_method must be one of ['random', 'top', 'bottom']"
         assert init_method in ['zero', 'random'], "init_method must be one of ['zero', 'random']"
+        assert adapt_method in ['ab', 'a', 'b'], "adapt_method must be one of ['ab', 'a', 'b']"
 
         self.in_features = in_features
         self.out_features = out_features
@@ -320,19 +330,22 @@ class PeftLinearDebug(nn.Module):
         self.bias = nn.Parameter(torch.zeros(out_features), requires_grad=bias_requires_grad) if bias else None
         self.use_scale = use_scale
         self.alpha = alpha
-        self.factorize_mode = factorize_mode
+        self.adapt_method = adapt_method
+        self.sample_method = sample_method
         self.factorize_method = factorize_method
         self.init_method = init_method
         self.debug = debug
         self.fast_mode = fast_mode
-        self.a = nn.Parameter(torch.zeros(in_features, self.rank)) if self.init_method == 'zero' else \
-            nn.Parameter(torch.randn(in_features, self.rank))
-        self.b = nn.Parameter(torch.randn(self.rank, out_features))
+
+        # Set requires_grad for a and b
+        requires_grad_a = True if self.adapt_method in ['ab', 'a'] else False
+        requires_grad_b = True if self.adapt_method in ['ab', 'b'] else False
+
+        a_init_func = torch.zeros if self.init_method == 'zero' else torch.randn
+        self.a = nn.Parameter(a_init_func(in_features, self.rank), requires_grad=requires_grad_a)
+        self.b = nn.Parameter(torch.randn(self.rank, out_features), requires_grad=requires_grad_b)
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
-
-        # if self.debug:
-        #     logging.warning("Debug mode is on. This will consume a lot of memory. ")
 
 
     def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
@@ -419,7 +432,7 @@ class PeftLinearDebug(nn.Module):
             # Check reconstruction error
             # if not self.fast_mode:
                 # assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
-            # trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.factorize_mode)
+            # trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.sample_method)
 
             # Set trainable and fixed parameters
             # init_a_trainable = a[:, trainable_indices]  # [in_f, r']
