@@ -126,11 +126,11 @@ class RosaNetDebug(PEFTNetDebug):
         logging.info(f'Initialized ROSA model with params:')
         logging.info(
             f'rank: {rank}, '
-             f'sample_method: {sample_method}, '
-             f'factorize_method: {factorize_method}, '
-             f'bias_requires_grad: {bias_requires_grad} '
-             f'debug: {debug}, '
-             f'fast_mode: {fast_mode}'
+            f'sample_method: {sample_method}, '
+            f'factorize_method: {factorize_method}, '
+            f'bias_requires_grad: {bias_requires_grad} '
+            f'debug: {debug}, '
+            f'fast_mosde: {fast_mode}'
         )
 
         # ROSA Model initializes low rank matrices with values obtained from SVD
