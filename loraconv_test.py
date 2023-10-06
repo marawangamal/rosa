@@ -1,17 +1,18 @@
 import torch
 import torch.nn as nn
 
-from peftnet import LoraNetConv
+from peftnet import PEFTNet
+
 
 class CNN(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1):
         super().__init__()
 
         Conv2d = nn.Conv2d
         self.layers = nn.Sequential(
-            Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size),
+            Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding),
             nn.ReLU(),
-            Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel_size)
+            Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding),
         )
 
     def forward(self, x):
@@ -26,7 +27,9 @@ def main():
         "in_channels": 3,
         "out_channels": 32,
         "kernel_size": 3,
-        "rank": 1,
+        "stride": 1,
+        "padding": 1,
+        "rank": 0.5,
         "device": "cuda:0"
     }
 
@@ -38,8 +41,16 @@ def main():
 
     device = torch.device(params["device"])
 
-    model = CNN(in_channels=params["in_channels"], out_channels=params["out_channels"], kernel_size=params["kernel_size"])
-    model = LoraNetConv(model, rank=params["rank"])
+    model = CNN(
+        in_channels=params["in_channels"], out_channels=params["out_channels"], kernel_size=params["kernel_size"],
+        stride=params["stride"], padding=params["padding"]
+    )
+    model = PEFTNet(
+        model,
+        peft_method="loraconv2d",
+        factorize_list=[nn.Conv2d.__name__],
+        rank=params["rank"]
+    )
     model = model.to(device)
 
     print(model)

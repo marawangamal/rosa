@@ -26,7 +26,6 @@ fnmodel:
   ignore_list: True # use predefined `ignore_list` consisting pf 'mlp'
   params:
     rank: 1
-    level: epoch
     adapt_method: none  # ["a", "b", "ab"]
     sample_method: random  # ["random", "top", "bottom"]
     factorize_method: equal # ["equal", "add"]  (w \gets usv1 + usv2  vs.  w \gets w + usv2)

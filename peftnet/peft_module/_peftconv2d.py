@@ -23,7 +23,8 @@ class PeftConv2d(nn.Module):
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
             debug: bool = False,
-            fast_mode: bool = False
+            fast_mode: bool = False,
+            *args, **kwargs
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
 
@@ -130,6 +131,8 @@ class PeftConv2d(nn.Module):
             in_channels=in_c,
             out_channels=out_c,
             kernel_size=kernel_size,
+            stride=conv_layer.stride,
+            padding=conv_layer.padding,
             rank=rank,
             bias=bias is not None,
             *args, **kwargs
