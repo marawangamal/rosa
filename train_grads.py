@@ -126,7 +126,7 @@ def main():
     # *** Configure HPs ***
 
     # Experiment parameters
-    n_trials = 1
+    n_trials = 100
     n_grad_pts_in_plot = 20  # number of points to plot in the gradient plot
 
     # Baseline model parameters
@@ -149,7 +149,7 @@ def main():
     filename = "grads_synthetic"
 
     # Set seeds
-    set_seeds(42)
+    # set_seeds(42)
 
     models = {"linear": LinearModel, "mlp2": MLP2Layer, "mlp4": MLP4Layer}
     init_model = models[model_name](in_features=in_f, out_features=out_f, bias=False, sigma=sigma_weights)
@@ -162,20 +162,23 @@ def main():
 
     test_model = pn.LoraNet(copy.deepcopy(init_model), rank=1, debug=True)
     layers_of_interest = [name for name, module in test_model.named_modules() if isinstance(module, LoraLinear)]
+    layers_of_interest_init = [n.replace("peft_model.", "") for n in layers_of_interest]
 
     layer_grads = {
         "rosa": {name: [] for name in layers_of_interest},
-        "lora": {name: [] for name in layers_of_interest}
+        "lora": {name: [] for name in layers_of_interest},
+        "init": {name: [] for name in layers_of_interest_init},
     }
 
     for trial in range(n_trials):
 
         peft_models = {
             "lora": pn.LoraNet(copy.deepcopy(init_model), rank=1, debug=True),
-            "rosa": pn.RosaNet(copy.deepcopy(init_model), rank=1, debug=True)
+            "rosa": pn.RosaNet(copy.deepcopy(init_model), rank=1, debug=True),
+            "init": copy.deepcopy(init_model),
         }
 
-        for name, model in peft_models.items():
+        for model_name, model in peft_models.items():
 
             # Make loss function
             loss_fn = torch.nn.MSELoss()
@@ -186,12 +189,20 @@ def main():
             loss = loss_fn(y_pred, y_train)
             loss.backward()
 
-            if name in ["lora", "rosa"]:
+            if model_name in ["lora", "rosa"]:
                 for layername, module in model.named_modules():
-                    if layername in layers_of_interest:
-                        print(f"{name}: {layername} grad: {module.ab.grad.flatten()[:5]}")
-                        print(f"{name}: {layername} weight: {module.ab.flatten()[:5]}")
-                        layer_grads[name][layername].append(module.ab.grad.flatten()[:n_grad_pts_in_plot])
+                    if layername in layers_of_interest or layername in layers_of_interest_init:
+                        print(f"{model_name}: {layername} grad: {module.ab.grad.flatten()[:5]}")
+                        print(f"{model_name}: {layername} weight: {module.ab.flatten()[:5]}")
+                        layer_grads[model_name][layername].append(module.ab.grad.flatten()[:n_grad_pts_in_plot])
+
+            elif model_name == "init":
+
+                for layername, module in model.named_modules():
+                    # import pdb;
+                    # pdb.set_trace()
+                    if layername in layers_of_interest_init:
+                        layer_grads[model_name][layername].append(module.weight.grad.flatten()[:n_grad_pts_in_plot])
             else:
                 raise NotImplementedError
 
@@ -205,25 +216,40 @@ def main():
 
     }
     plt.figure(figsize=(8, 6))
-    for name, grads in layer_grads.items():
+    for model_name, grads in layer_grads.items():
+        if model_name == "init":
+            continue
         for layername, layer_grad in grads.items():
             # if "l1" not in layername:
             #     continue
-            grads_mean = torch.stack(layer_grad).mean(dim=0)
-            grads_std = torch.stack(layer_grad).std(dim=0)
-            plt.errorbar(
-                range(len(grads_mean)),
-                grads_mean,
-                yerr=grads_std,
-                fmt="-." if name == "lora" else "--x",
-                # facecolors='none',
-                label=f"{name}_{layername}",
-                color=layernames2colors[layername]
+            init_grads = layer_grads["init"][layername.replace("peft_model.", "")]
+            cos_sim = torch.nn.functional.cosine_similarity(
+                torch.stack(init_grads),
+                torch.stack(layer_grad),
+                dim=1
             )
-    plt.xlabel("Dimension")
-    plt.ylabel("Gradient")
-    plt.legend()
-    plt.savefig(f"figures/grads_all_{filename}.png")
+
+            avg_cos_sim = cos_sim.mean()
+
+            print(
+                f"{model_name}: {layername} avg cos sim: {avg_cos_sim:.3f}"
+            )
+
+    #         grads_mean = torch.stack(layer_grad).mean(dim=0)
+    #         grads_std = torch.stack(layer_grad).std(dim=0)
+    #         plt.errorbar(
+    #             range(len(grads_mean)),
+    #             grads_mean,
+    #             yerr=grads_std,
+    #             fmt="-." if model_name == "lora" else "--x",
+    #             # facecolors='none',
+    #             label=f"{model_name}_{layername}",
+    #             color=layernames2colors[layername]
+    #         )
+    # plt.xlabel("Dimension")
+    # plt.ylabel("Gradient")
+    # plt.legend()
+    # plt.savefig(f"figures/grads_all_{filename}.png")
 
 
 if __name__ == '__main__':

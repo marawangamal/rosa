@@ -20,9 +20,17 @@ source /home/mila/m/marawan.gamal/.venv/rosa/bin/activate
 #python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=qnli train.epochs=10  train.batch_size=16 fnmodel.name=ia3 fnmodel.params.rank=2 train.lr=2e-3
 
 # NVIDIA A100-SXM4-40GB
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 train.lr=2e-5
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=4 train.epochs=4 train.lr=2e-3
-python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=4 train.epochs=4 train.lr=2e-4
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 train.lr=2e-5
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=4 train.epochs=4 train.lr=2e-3
+#python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=4 train.epochs=4 train.lr=2e-4
+
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 +task=cola train.epochs=5 train.lr=2e-5 train.optimizer.name=sgd
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=rosa fnmodel.params.factorize_mode=bottom +task=cola fnmodel.params.rank=2 train.epochs=5 train.lr=2e-3 fnmodel.params.bias_requires_grad=False train.optimizer.name=sgd fnmodel.factorize_freq=1
+python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=2 train.epochs=5 train.lr=2e-3 fnmodel.params.bias_requires_grad=False train.optimizer.name=sgd
+
+
+
+
 
 
 # Wandb sweep commands

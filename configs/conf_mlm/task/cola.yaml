@@ -1,33 +1,5 @@
 # @package _global_
 
-runs: 1
-debug: true
-train:
-  epochs: 10
-  lr: 2.0e-05
-  batch_size: 32
-  optimizer:
-    name: adamw
-    params:
-      betas: [0.9, 0.98]
-      eps: 1.0e-08 # instead of 1.0e-06
-      weight_decay: 0.1
-  scheduler:
-    name: linear
-    warmup_ratio: 0.06 # or 0.1
-model:
-  name: roberta-base
-fnmodel:
-  name: none
-logging:
-  print_freq: 100
-  eval_freq: 100  # log every n batches
-  eval_level: epoch  # ["epoch", "batch"]
-  input_size: [4, 512]  # used to compute latency [batch_size, seq_len]
-  memory_info: true
 dataset:
   name: glue
   task_name: cola
-eval:
-  batch_size: 16
-  experiment: runs/glue/cola/roberta-base_factorized_0.01_epoch_random_1.0_5e-05_5_1
