@@ -15,6 +15,7 @@ class LoraNet(PEFTNet):
             use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
+            adapt_method: str = 'ab',  # 'a', 'b', 'ab'
             init_method: str = "zero",
             bias_requires_grad: bool = True,
             debug: bool = False,
@@ -28,6 +29,7 @@ class LoraNet(PEFTNet):
             rank: rank of factorized matrices
             ignore_list: names of layers to ignore
             factorize_list: names of modules types to replace
+            adapt_method: adaptation method [`a`, `b`, `ab`]
             debug: whether to use debug mode
 
         Notes:
@@ -43,6 +45,7 @@ class LoraNet(PEFTNet):
             replacement_kwargs=dict(
                 rank=rank,
                 use_scale=use_scale,
+                adapt_method=adapt_method,
                 init_method=init_method,
                 bias_requires_grad=bias_requires_grad,
                 debug=debug,

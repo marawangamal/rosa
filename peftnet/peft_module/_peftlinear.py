@@ -20,7 +20,7 @@ class PeftLinear(nn.Module):
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
             debug: bool = False,
-            fast_mode: bool = False,
+            fast_mode: bool = False
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
 
@@ -71,12 +71,12 @@ class PeftLinear(nn.Module):
         self.fast_mode = fast_mode
 
         # Set requires_grad for a and b
-        requires_grad_a = True if self.adapt_method in ['ab', 'a'] else False
-        requires_grad_b = True if self.adapt_method in ['ab', 'b'] else False
+        self.requires_grad_a = True if self.adapt_method in ['ab', 'a'] else False
+        self.requires_grad_b = True if self.adapt_method in ['ab', 'b'] else False
 
         a_init_func = torch.zeros if self.init_method == 'zero' else torch.randn
-        self.a = nn.Parameter(a_init_func(in_features, self.rank), requires_grad=requires_grad_a)
-        self.b = nn.Parameter(torch.randn(self.rank, out_features), requires_grad=requires_grad_b)
+        self.a = nn.Parameter(a_init_func(in_features, self.rank), requires_grad=self.requires_grad_a)
+        self.b = nn.Parameter(torch.randn(self.rank, out_features), requires_grad=self.requires_grad_b)
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
 
@@ -193,8 +193,8 @@ class PeftLinear(nn.Module):
             self.w.data = self.w.data.contiguous()
 
             # Make `a`, `b` trainable and `w` fixed
-            self.a.requires_grad = True
-            self.b.requires_grad = True
+            self.a.requires_grad = self.requires_grad_a
+            self.b.requires_grad = self.requires_grad_b
             self.w.requires_grad = False
 
             # Toggle merged flag

@@ -15,6 +15,7 @@ class RosaNet(PEFTNet):
             use_scale: bool = False,
             ignore_list: list = None,
             factorize_list: list = None,
+            adapt_method: str = 'ab',  # 'a', 'b', 'ab'
             sample_method: str = 'random',
             factorize_method: str = 'equal',  # 'equal', 'add'
             bias_requires_grad: bool = True,
@@ -29,6 +30,7 @@ class RosaNet(PEFTNet):
             rank: rank of factorized matrices
             ignore_list: names of layers to ignore
             factorize_list: names of modules types to replace
+            adapt_method: adaptation method [`a`, `b`, `ab`]
             sample_method: factorize mode [`random`, `top`, `bottom`]
             factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
             bias_requires_grad: whether to make bias trainable
@@ -48,6 +50,7 @@ class RosaNet(PEFTNet):
             replacement_kwargs=dict(
                 rank=rank,
                 use_scale=use_scale,
+                adapt_method=adapt_method,
                 sample_method=sample_method,
                 factorize_method=factorize_method,
                 bias_requires_grad=bias_requires_grad,
@@ -59,11 +62,12 @@ class RosaNet(PEFTNet):
         logging.info(f'Initialized ROSA model with params:')
         logging.info(
             f'rank: {rank}, '
-             f'sample_method: {sample_method}, '
-             f'factorize_method: {factorize_method}, '
-             f'bias_requires_grad: {bias_requires_grad} '
-             f'debug: {debug}, '
-             f'fast_mode: {fast_mode}'
+            f'adapt_method: {adapt_method}, '
+            f'sample_method: {sample_method}, '
+            f'factorize_method: {factorize_method}, '
+            f'bias_requires_grad: {bias_requires_grad} '
+            f'debug: {debug}, '
+            f'fast_mode: {fast_mode}'
         )
 
         # ROSA Model initializes low rank matrices with values obtained from SVD

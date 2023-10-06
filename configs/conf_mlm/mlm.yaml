@@ -31,7 +31,7 @@ fnmodel:
     sample_method: random  # ["random", "top", "bottom"]
     factorize_method: equal # ["equal", "add"]  (w \gets usv1 + usv2  vs.  w \gets w + usv2)
     use_scale: False  # scale factorization by rank
-    bias_requires_grad: True  # whether to optimize bias
+    bias_requires_grad: False  # whether to optimize bias
     fast_mode: False  # use fast mode
 logging:
   print_freq: 100
