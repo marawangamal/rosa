@@ -1,3 +1,5 @@
+import re
+
 import torch.nn as nn
 import pandas as pd
 
@@ -6,33 +8,30 @@ class PEFTNet(nn.Module):
     def __init__(
             self,
             model: nn.Module,
-            ignore_list: list = None,
-            factorize_list: list = None,
-            replacement_module: nn.Module = None,
-            replacement_kwargs: dict = None,
+            peft_map: dict,
+            peft_kwargs: dict = None,
+            ignore_regex: str = None,
             *args, **kwargs
     ):
         """ Abstract class for PEFT models. PEFT models are models that can be factorized and merged.
 
         Args:
             model: model to be factorized
-            ignore_list: names of layers to ignore
-            factorize_list: names of modules types to replace
-            replacement_module: replacement module
-            replacement_kwargs: kwargs for replacement module constructor
+            peft_map: dictionary mapping module types to replacement modules
+            peft_kwargs: dictionary mapping module types to kwargs for replacement modules
+            ignore_regex: names of layers to ignore
 
         Notes:
-            - only modules types in `factorize_list` will be factorized
-
+            - Modules in `peft_map` dict will be replaced
+            - kwargs are passed to replacement module `from_module` method
 
         """
         super().__init__(*args, **kwargs)
 
-        self.factorize_list = factorize_list
-        self.ignore_list = list() if ignore_list is None else ignore_list
-        self.replacement_module = replacement_module
-        self.factorize_map = {f: replacement_module for f in self.factorize_list}
-        self.replacement_kwargs = replacement_kwargs if replacement_kwargs is not None else dict()
+        # Set default values
+        self.ignore_regex = ignore_regex
+        self.peft_map = peft_map
+        self.peft_kwargs = peft_kwargs if peft_kwargs is not None else {k: dict() for k in peft_map.keys()}
 
         # Make modules non-trainable
         for param in model.parameters():
@@ -41,24 +40,28 @@ class PEFTNet(nn.Module):
         self.peft_model = model
         self.apply_peft()
 
+
     def apply_peft(self) -> 'PEFTNet':
         """Replace linear modules with peft modules"""
-        condition = lambda lyr, name: type(lyr).__name__ in self.factorize_map.keys() and \
-                                      name not in self.ignore_list
-        replacement_function = lambda lyr: self.factorize_map[type(lyr).__name__].from_module(
-            lyr, **self.replacement_kwargs
+        if self.ignore_regex is not None:
+            condition = lambda lyr, name: type(lyr).__name__ in self.peft_map.keys() and \
+                                          not bool(re.match(self.ignore_regex, name))
+        else:
+            condition = lambda lyr, name: type(lyr).__name__ in self.peft_map.keys()
+        replacement_function = lambda lyr: self.peft_map[type(lyr).__name__].from_module(
+            lyr, **self.peft_kwargs[type(lyr).__name__]
         )
         return self._replace(condition, replacement_function)
 
     def merge(self) -> 'PEFTNet':
         """Apply `merge` on peft modules"""
-        condition = lambda lyr, name: isinstance(lyr, self.replacement_module)
+        condition = lambda lyr, name: any([isinstance(lyr, m) for m in self.peft_map.values()])
         replacement_function = lambda lyr: lyr.merge()
         return self._replace(condition, replacement_function)
 
     def factorize(self) -> 'PEFTNet':
         """Apply `factorize` on peft modules. If a module is already factorized, it will be merged and re-factorized"""
-        condition = lambda lyr, name: isinstance(lyr, self.replacement_module)
+        condition = lambda lyr, name: any([isinstance(lyr, m) for m in self.peft_map.values()])
         replacement_function = lambda lyr: lyr.factorize()
         return self._replace(condition, replacement_function)
 
@@ -144,6 +147,21 @@ class PEFTNet(nn.Module):
             except ValueError:
                 pass
         return parsed
+
+    def __getattr__(self, name):
+        try:
+            # Try to get attribute from PEFTNet itself first
+            return super(PEFTNet, self).__getattr__(name)
+        except AttributeError:
+            # If not found, try to get it from the internal peft_model
+            return getattr(self.peft_model, name)
+
+    def __hasattr__(self, name):
+        # Check if PEFTNet has the attribute
+        if name in self.__dict__:
+            return True
+        # If not, check the internal peft_model
+        return hasattr(self.peft_model, name)
 
     def forward(self, *args, **kwargs):
         return self.peft_model(*args, **kwargs)

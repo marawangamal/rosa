@@ -9,45 +9,95 @@ from peftnet.peft_module.ia3linear import IA3Linear
 from peftnet.peft_module.loraconv2d import LoraConv2d
 
 
+# fan_in_fan_out_map = {
+#     "Conv1D": True,
+#     "Linear": False,
+# }
+
+default_peft_map = {
+    "rosa": {
+        "Linear": RosaLinear,
+    },
+    "lora": {
+        "Linear": LoraLinear,
+    },
+    "ia3": {
+        "Linear": IA3Linear,
+    },
+    "loraconv2d": {
+        "Conv2d": LoraConv2d
+    },
+    "lorafull": {
+        "Linear": LoraLinear,
+        "Conv2d": LoraConv2d
+    }
+}
+
+default_peft_map_kwargs = {
+    "rosa": {
+        "Linear": {
+            "fan_in_fan_out": True
+        }
+    },
+    "lora": {
+        "Linear": {
+            "fan_in_fan_out": False
+        }
+    },
+    "ia3": {
+        "Linear": {
+            "fan_in_fan_out": False
+        }
+    },
+    "loraconv2d": {
+        "Conv2d": {}
+    },
+    "lorafull": {
+        "Linear": {
+            "fan_in_fan_out": False
+        },
+        "Conv2d": {}
+    },
+}
+
+
 class PEFTNet(_PEFTNet):
     def __init__(
             self,
             model: nn.Module,
-            peft_method: str = "lora",
-            factorize_list: list = None,
-            ignore_list: list = None,
+            method: str = "lora",
+            peft_map: dict = None,
+            peft_kwargs: dict = None,
+            ignore_regex: str = None,
             *args, **kwargs
     ):
         """ PEFT model for efficient adaptation of linear layers
 
         Args:
             model: model to be factorized
-            peft_method: {'rosa', 'lora', 'ia3', 'loraconv2d'}
-            factorize_list: names of modules types to replace {'Linear', 'Conv2d'}. Default: ['Linear']
-            ignore_list: names of layers to ignore (e.g. ['bert.embeddings'])
+            method: {'rosa', 'lora', 'ia3', 'loraconv2d'}
+            target_modules: names of modules types to peft {'Linear', 'Conv2d'}. Default: ['Linear']
+            ignore_regex: regex to match layers to ignore (e.g. ['bert.embeddings'])
 
         Notes:
             - only modules types in `factorize_list` will be factorized
             - kwargs are passed to replacement module `from_module` method
 
+        Warning:
+            If `model` has both Linear and Conv1D layers, this will cause an error
+
         """
 
-        replacement_module = {
-            "rosa": RosaLinear,
-            "lora": LoraLinear,
-            "ia3": IA3Linear,
-            "loraconv2d": LoraConv2d
-        }[peft_method]
+        peft_map = default_peft_map[method] if peft_map is None else peft_map
+        peft_kwargs = default_peft_map_kwargs[method] if peft_kwargs is None else peft_kwargs
 
-        if factorize_list is None:
-            factorize_list = ['Linear', 'Conv1D']
+        # Add **kwargs to peft_kwargs to all keys in peft_kwargs
+        for k, v in peft_kwargs.items():
+            peft_kwargs[k] = {**v, **kwargs}
 
         super().__init__(
             model,
-            ignore_list=ignore_list,
-            factorize_list=factorize_list,
-            replacement_module=replacement_module,
-            replacement_kwargs=kwargs
+            peft_map=peft_map,
+            peft_kwargs=peft_kwargs,
+            ignore_regex=ignore_regex,
         )
-
-        logging.info(f"PEFTNet: {self.factorize_list} -> {replacement_module}")

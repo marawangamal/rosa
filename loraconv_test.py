@@ -29,7 +29,7 @@ def main():
         "kernel_size": 3,
         "stride": 1,
         "padding": 1,
-        "rank": 0.5,
+        "rank": 4,
         "device": "cuda:0"
     }
 
@@ -47,7 +47,7 @@ def main():
     )
     model = PEFTNet(
         model,
-        peft_method="loraconv2d",
+        method="loraconv2d",
         factorize_list=[nn.Conv2d.__name__],
         rank=params["rank"]
     )

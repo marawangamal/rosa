@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import tltorch
 
+from .tensorconv import CPConv2d
+
 
 class PeftConv2d(nn.Module):
     def __init__(
@@ -88,14 +90,18 @@ class PeftConv2d(nn.Module):
         self.requires_grad_a = True if self.adapt_method in ['ab', 'a'] else False
         self.requires_grad_b = True if self.adapt_method in ['ab', 'b'] else False
 
-        self.w_hat_conv = tltorch.FactorizedConv(
-            self.in_channels, self.out_channels, self.kernel_size, order=2, rank=rank, factorization='cp',
-            bias=False, padding=self.padding, stride=self.stride
+        self.w_hat_conv = CPConv2d(
+            self.in_channels, self.out_channels, self.kernel_size, bias=False, rank=self.rank,
+            padding=self.padding, stride=self.stride
         )
 
         self.w_conv = nn.Conv2d(
             self.in_channels, self.out_channels, self.kernel_size, bias=False, padding=self.padding, stride=self.stride
         )
+
+        # Make w_conv non-trainable
+        for param in self.w_conv.parameters():
+            param.requires_grad = False
 
         self.bias = nn.Parameter(torch.zeros(out_channels), requires_grad=bias_requires_grad) if bias else None
         self.register_buffer('merged', torch.tensor([False]))
@@ -103,7 +109,8 @@ class PeftConv2d(nn.Module):
     def initialize_weights(self, w_init: torch.Tensor = None, bias_init: torch.Tensor = None):
         """Initialize weights and biases with given tensors."""
         self.w_conv.weight.data = w_init if w_init is not None else self.w_conv.weight.data
-        self.bias.data = bias_init if bias_init is not None else self.bias.data
+        if self.bias is not None:
+            self.bias.data = bias_init if bias_init is not None else self.bias.data
 
     @classmethod
     def from_module(cls, conv_layer: nn.Module, rank=1.0, *args, **kwargs) -> nn.Module:
@@ -146,16 +153,6 @@ class PeftConv2d(nn.Module):
     def factorize(self):
         raise NotImplementedError
 
-    # def __repr__(self):
-    #     cls = self.__class__.__name__
-    #     return (f'{cls}('
-    #             f'rank={self.rank}, '
-    #             f'a={self.a.shape} grad={self.a.requires_grad} scale={self.use_scale}, alpha={self.alpha}, '
-    #             f'b={self.b.shape} grad={self.b.requires_grad}, '
-    #             f'w={self.w.shape} grad={self.w.requires_grad}, '
-    #             f'bias={(self.bias.shape, self.bias.requires_grad) if self.bias is not None else None}'
-    #             f')')
-
     @staticmethod
     def _integer_rank(rank, full_rank):
         """Convert a ratio to an integer"""
@@ -188,7 +185,7 @@ class PeftConv2d(nn.Module):
         return chosen_ids, remaining_ids
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """ Forward pass. Assumes `w` is fan_in x fan_out.
+        """ Forward pass.
 
         Args:
             x: [N, C, H, W] input tensor
@@ -197,9 +194,6 @@ class PeftConv2d(nn.Module):
             y: [N, F, H, W] output tensor
         """
 
-        # if self.merged.item() and self.training:
-        #     raise RuntimeError("Cannot call forward on a merged layer in training mode. ")
-
         if self.merged.item():
             raise NotImplementedError("Merged forward pass not implemented yet.")
         elif self.debug:  # retain intermediate gradient (for plotting purposes)
@@ -207,4 +201,6 @@ class PeftConv2d(nn.Module):
         else:
             # [*, in_channels] @ [in_channels, rank] @ [rank, out_channels] + [out_channels, 1] = [*, out_channels]
             y = self.w_hat_conv(x) + self.w_conv(x)
+            if self.bias is not None:
+                y += self.bias.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
             return y

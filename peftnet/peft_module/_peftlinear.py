@@ -89,7 +89,8 @@ class PeftLinear(nn.Module):
         self.w.data = w_init if w_init is not None else self.w.data
 
         if bias_init is not None:
-            assert self.bias.data.shape == bias_init.shape, "Bias shape mismatch"
+            assert self.bias.data.shape == bias_init.shape, \
+                f"Bias shape mismatch {self.bias.data.shape} != {bias_init.shape}"
             self.bias.data = bias_init
 
     @classmethod

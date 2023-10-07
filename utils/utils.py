@@ -122,7 +122,7 @@ def get_yaml_dict(yaml_path="conf_clm.yaml"):
             print(exc)
 
 
-def get_experiment_name(configs, abbrevs=None):
+def get_experiment_name(configs, abbrevs=None, mode='dict'):
     if abbrevs is None:
         abbrevs = {}
 
@@ -140,7 +140,12 @@ def get_experiment_name(configs, abbrevs=None):
                 if i == len(key) + 1:
                     raise ValueError("Could not find a suitable abbreviation for key: {}".format(key))
 
-    return abbrevs
+    if mode == 'str':
+        return '_'.join(['{}{}'.format(k, v) for k, v in abbrevs.items()])
+    elif mode == 'dict':
+        return abbrevs
+    else:
+        raise ValueError("Mode must be either 'str' or 'dict'.")
 
 
 def get_latency(model, device='cpu', inp=torch.randn(32, 3, 224, 224), iters=2):

@@ -601,9 +601,9 @@ def main(cfg: DictConfig):
         # Create PEFT model
         pmodel = pn.PEFTNet(
             model,
-            peft_method=args['fnmodel']['name'],
+            method=args['fnmodel']['name'],
             factorize_list=['Linear', 'Conv1D'],
-            ignore_list=ignore_list,
+            ignore_regex=ignore_list,
             **args['fnmodel']['params']
         ) if args['fnmodel']['name'].lower() != "none" else model
 

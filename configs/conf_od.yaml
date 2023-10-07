@@ -1,0 +1,15 @@
+runs: 1
+seed: -1 # random seed
+train:
+  epochs: 10
+  lr: 1e-5
+  batch_size: 8
+pmodel:
+  method: none # [loraconv2d, rosa, lora, none]
+  rank: 4 # rank of trainable parameters [float in (0,1) or int]
+output:
+  path: /home/mila/m/marawan.gamal/scratch/lora-tensor
+dataset:
+  name: cppe-5
+
+# python train_object_detection.py pmodel.method=loraconv2d pmodel.rank=4
