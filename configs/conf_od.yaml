@@ -3,7 +3,9 @@ seed: -1 # random seed
 train:
   epochs: 10
   lr: 1e-5
-  batch_size: 8
+  batch_size: 32
+  weight_decay: 1e-4
+  fp16: True
 pmodel:
   method: none # [loraconv2d, rosa, lora, none]
   rank: 4 # rank of trainable parameters [float in (0,1) or int]
@@ -12,4 +14,4 @@ output:
 dataset:
   name: cppe-5
 
-# python train_object_detection.py pmodel.method=loraconv2d pmodel.rank=4
+# python train_od.py pmodel.method=loraconv2d pmodel.rank=4

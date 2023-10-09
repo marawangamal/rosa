@@ -1,9 +1,39 @@
+import json
+import os
+
 import numpy as np
 import torch
+import torchvision
 from datasets import load_dataset
 from transformers import AutoImageProcessor
 
 import albumentations
+
+
+def coco_bbox_to_pascal_bbox(bbox, img_dims=(1, 1)):
+    """Convert normalized [x-top-left, y-top-left, width, height] to normalized [xmin, ymin, xmax, ymax].
+
+    Args:
+    - bbox (list): List containing normalized [x_top_left, y_top_left, width, height]
+    - img_dims (list): List containing [image_height, image_width]
+
+    Returns:
+    - List containing normalized [xmin, ymin, xmax, ymax]
+    """
+
+    # Extracting normalized values from the bbox list
+    x_top_left, y_top_left, width, height = bbox
+    img_height, img_width = img_dims
+
+    # Calculating normalized xmin, ymin, xmax, ymax
+    xmin = x_top_left * img_width
+    ymin = y_top_left * img_height
+    xmax = xmin + (width * img_width)
+    ymax = ymin + (height * img_height)
+
+    normalized_bbox = [xmin/img_width, ymin/img_height, xmax/img_width, ymax/img_height]
+
+    return normalized_bbox
 
 
 def collate_fn(batch, image_processor):
@@ -82,7 +112,8 @@ def transform_aug_ann(examples, image_processor, apply_aug=True):
     return image_processor(images=images, annotations=targets, return_tensors="pt")
 
 
-def get_dataloaders(image_processor_checkpoint="facebook/detr-resnet-50", dataset="cppe-5"):
+def get_dataloaders(image_processor_checkpoint="facebook/detr-resnet-50", dataset="cppe-5", create_coco=False,
+                    coco_path=os.getcwd()):
 
     image_processor = AutoImageProcessor.from_pretrained(image_processor_checkpoint)
     train_dataset = load_dataset(dataset, split="train")
@@ -103,11 +134,11 @@ def get_dataloaders(image_processor_checkpoint="facebook/detr-resnet-50", datase
 
     test_dataset = load_dataset(dataset, split="test")
     test_dataset = remove_invalid_images(test_dataset)
-    test_dataset = test_dataset.with_transform(
+
+    test_dataset_ = test_dataset.with_transform(
         lambda x: transform_aug_ann(x, image_processor)
     )
-
-    test_dataloader = torch.utils.data.DataLoader(
+    test_dataloader_ = torch.utils.data.DataLoader(
         test_dataset,
         batch_size=8,
         shuffle=False,
@@ -115,4 +146,88 @@ def get_dataloaders(image_processor_checkpoint="facebook/detr-resnet-50", datase
         collate_fn=lambda x: collate_fn(x, image_processor)
     )
 
-    return train_dataset, test_dataset, test_dataloader, image_processor, id2label, label2id
+    if create_coco:
+        path_output_cppe5, path_anno = save_cppe5_annotation_file_images(test_dataset, id2label, coco_path)
+        test_ds_coco_format = CocoDetection(path_output_cppe5, image_processor, path_anno)
+        test_dl_coco_format = torch.utils.data.DataLoader(
+            test_ds_coco_format, batch_size=8, shuffle=False, num_workers=4,
+            collate_fn=lambda x: collate_fn(x, image_processor)
+        )
+
+        return (train_dataset, test_dataset_, test_dataloader_, test_ds_coco_format, test_dl_coco_format,
+                image_processor, id2label, label2id)
+
+    return train_dataset, test_dataset_, test_dataloader_, image_processor, id2label, label2id
+
+
+def val_formatted_anns(image_id, objects):
+    annotations = []
+    for i in range(0, len(objects["id"])):
+        new_ann = {
+            "id": objects["id"][i],
+            "category_id": objects["category"][i],
+            "iscrowd": 0,
+            "image_id": image_id,
+            "area": objects["area"][i],
+            "bbox": objects["bbox"][i],
+        }
+        annotations.append(new_ann)
+
+    return annotations
+
+
+def save_cppe5_annotation_file_images(cppe5, id2label, path_root):
+    # Save images and annotations into the files torchvision.datasets.CocoDetection expects
+    output_json = {}
+    # path_output_cppe5 = f"{os.getcwd()}/cppe5/"
+    path_output_cppe5 = os.path.join(path_root, "cppe5")
+
+    if not os.path.exists(path_output_cppe5):
+        os.makedirs(path_output_cppe5)
+
+    path_anno = os.path.join(path_output_cppe5, "cppe5_ann.json")
+    categories_json = [{"supercategory": "none", "id": id, "name": id2label[id]} for id in id2label]
+    output_json["images"] = []
+    output_json["annotations"] = []
+
+    for example in cppe5:
+        ann = val_formatted_anns(example["image_id"], example["objects"])
+        output_json["images"].append(
+            {
+                "id": example["image_id"],
+                "width": example["image"].width,
+                "height": example["image"].height,
+                "file_name": f"{example['image_id']}.png",
+            }
+        )
+        output_json["annotations"].extend(ann)
+    output_json["categories"] = categories_json
+
+    with open(path_anno, "w") as file:
+        json.dump(output_json, file, ensure_ascii=False, indent=4)
+
+    for im, img_id in zip(cppe5["image"], cppe5["image_id"]):
+        path_img = os.path.join(path_output_cppe5, f"{img_id}.png")
+        im.save(path_img)
+
+    return path_output_cppe5, path_anno
+
+
+class CocoDetection(torchvision.datasets.CocoDetection):
+    def __init__(self, img_folder, image_processor, ann_file):
+        super().__init__(img_folder, ann_file)
+        self.image_processor = image_processor
+
+    def __getitem__(self, idx):
+        # read in PIL image and target in COCO format
+        img, target = super(CocoDetection, self).__getitem__(idx)
+
+        # preprocess image and target: converting target to DETR format,
+        # resizing + normalization of both image and target)
+        image_id = self.ids[idx]
+        target = {"image_id": image_id, "annotations": target}
+        encoding = self.image_processor(images=img, annotations=target, return_tensors="pt")
+        pixel_values = encoding["pixel_values"].squeeze()  # remove batch dimension
+        target = encoding["labels"][0]  # remove batch dimension
+
+        return {"pixel_values": pixel_values, "labels": target}

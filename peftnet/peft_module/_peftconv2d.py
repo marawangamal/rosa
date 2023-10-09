@@ -199,6 +199,7 @@ class PeftConv2d(nn.Module):
         elif self.debug:  # retain intermediate gradient (for plotting purposes)
             raise NotImplementedError("Debug mode not implemented yet.")
         else:
+            # import pdb; pdb.set_trace()
             # [*, in_channels] @ [in_channels, rank] @ [rank, out_channels] + [out_channels, 1] = [*, out_channels]
             y = self.w_hat_conv(x) + self.w_conv(x)
             if self.bias is not None:
