@@ -1,7 +1,9 @@
 import os
 import os.path as osp
+import time
+
 from tqdm import tqdm
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import hydra
 import evaluate
@@ -32,9 +34,6 @@ checkpoint = "facebook/detr-resnet-50"
     create_coco=True
 )
 
-# Load evaluator
-module = evaluate.load("ybelkada/cocoevaluate", coco=test_ds_coco_format.coco)
-
 
 def flatten_list_of_lists(list_of_lists):
     return [item for sublist in list_of_lists for item in sublist]
@@ -42,42 +41,115 @@ def flatten_list_of_lists(list_of_lists):
 
 class CustomTrainer(Trainer):
 
+    def eval_internal(
+            self,
+            eval_dataset: Optional[Dataset] = None,
+            ignore_keys: Optional[List[str]] = None,
+            metric_key_prefix: str = "eval",
+    ) -> Dict[str, float]:
+        """
+        Run evaluation and returns metrics.
+
+        The calling script will be responsible for providing a method to compute metrics, as they are task-dependent
+        (pass it to the init `compute_metrics` argument).
+
+        You can also subclass and override this method to inject custom behavior.
+
+        Args:
+            eval_dataset (`Dataset`, *optional*):
+                Pass a dataset if you wish to override `self.eval_dataset`. If it is a [`~datasets.Dataset`], columns
+                not accepted by the `model.forward()` method are automatically removed. It must implement the `__len__`
+                method.
+            ignore_keys (`List[str]`, *optional*):
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions.
+            metric_key_prefix (`str`, *optional*, defaults to `"eval"`):
+                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
+                "eval_bleu" if the prefix is "eval" (default)
+
+        Returns:
+            A dictionary containing the evaluation loss and the potential metrics computed from the predictions. The
+            dictionary also contains the epoch number which comes from the training state.
+        """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
+        eval_dataloader = self.get_eval_dataloader(eval_dataset)
+        start_time = time.time()
+
+        eval_loop = self.prediction_loop if self.args.use_legacy_prediction_loop else self.evaluation_loop
+        output = eval_loop(
+            eval_dataloader,
+            description="Evaluation",
+            # No point gathering the predictions if there are no metrics, otherwise we defer to
+            # self.args.prediction_loss_only
+            prediction_loss_only=True if self.compute_metrics is None else None,
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+        )
+
+        # total_batch_size = self.args.eval_batch_size * self.args.world_size
+        # if f"{metric_key_prefix}_jit_compilation_time" in output.metrics:
+        #     start_time += output.metrics[f"{metric_key_prefix}_jit_compilation_time"]
+
+        # output.metrics.update(
+        #     speed_metrics(
+        #         metric_key_prefix,
+        #         start_time,
+        #         num_samples=output.num_samples,
+        #         num_steps=math.ceil(output.num_samples / total_batch_size),
+        #     )
+        # )
+
+        # self.log(output.metrics) <--- commented out to log in the main function
+
+        return output.metrics
+
     def evaluate(
         self,
         eval_dataset: Optional[Dataset] = None,
         ignore_keys: Optional[List[str]] = None,
         metric_key_prefix: str = "eval",
     ):
+
+        # Load evaluator
+        module = evaluate.load("ybelkada/cocoevaluate", coco=test_ds_coco_format.coco)
+
         with torch.no_grad():
             # Call the original evaluate method
-            results = super().evaluate(eval_dataset, ignore_keys, metric_key_prefix)
+            results_total = self.eval_internal(eval_dataset, ignore_keys, metric_key_prefix)
 
             eval_dataloader = test_dl_coco_format
             model = self._wrap_model(self.model, training=False, dataloader=eval_dataloader)
-            import pdb;
-            pdb.set_trace()
+
             for i, batch in enumerate(eval_dataloader):
                 inputs = self._prepare_inputs(batch)
                 pixel_values = inputs["pixel_values"]
                 pixel_mask = inputs["pixel_mask"]
 
                 labels = [
-                    {k: v for k, v in t.items()} for t in batch["labels"]
+                    {k: v for k, v in t.items()} for t in inputs["labels"]
                 ]  # these are in DETR format, resized + normalized
 
                 # forward pass
                 outputs = model(pixel_values=pixel_values, pixel_mask=pixel_mask)
 
                 orig_target_sizes = torch.stack([target["orig_size"] for target in labels], dim=0)
-
                 # convert outputs of model to COCO api
-                results = image_processor.post_process_object_detection(outputs, orig_target_sizes)
+                results = image_processor.post_process(outputs, orig_target_sizes)
 
                 module.add(prediction=results, reference=labels)
+                del inputs
                 del batch
 
         results = module.compute()
-        print(results)
+        results_total.update(
+            {f"{metric_key_prefix}_{key}": value for key, value in results['iou_bbox'].items()}
+        )
+        self.log(results_total)
+        self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, results_total)
+        self._memory_tracker.stop_and_update_metrics(results_total)
+        return results_total
 
     def evaluate_old(
         self,
