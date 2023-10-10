@@ -15,7 +15,7 @@ The `PEFTNet` class can be used to create a ROSA/LoRA model from any pretrained 
 import peftnet as pn
 
 model = AutoModelForCausalLM.from_pretrained('gpt2')
-PEFTModel = pn.PEFTNet(model, method='loraconv2d', rank=4)  
+PEFTModel = pn.PEFTNet(model, method='rosa', rank=4)  
 ```
 
 ## Training (GLUE)
