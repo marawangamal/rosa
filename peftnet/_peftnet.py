@@ -75,15 +75,16 @@ class PEFTNet(nn.Module):
 
         return self
 
-    def get_report(self) -> str:
+    @classmethod
+    def get_report(cls, model) -> str:
         """Get report on factorized model"""
 
         safe_div = lambda x, y: x / y if y != 0 else 0
 
         # Trainable params table
         df = pd.DataFrame()
-        for name, layer in self.peft_model.named_modules():
-            params_dict = self.get_num_params(layer)
+        for name, layer in model.named_modules():
+            params_dict = cls.get_num_params(layer)
 
             df.at[name, 'name'] = name
             df.at[name, 'type'] = type(layer).__name__
@@ -98,8 +99,8 @@ class PEFTNet(nn.Module):
         # Return string
         return df.to_string()
 
-    @staticmethod
-    def get_num_params(model: nn.Module) -> dict:
+    @classmethod
+    def get_num_params(cls, model: nn.Module) -> dict:
         params_dict = {k: 0 for k in ["trainable", "fixed", "total"]}
         for p in model.parameters():
             params_dict['total'] += p.numel()

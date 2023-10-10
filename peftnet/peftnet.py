@@ -8,7 +8,6 @@ from peftnet.peft_module.loralinear import LoraLinear
 from peftnet.peft_module.ia3linear import IA3Linear
 from peftnet.peft_module.loraconv2d import LoraConv2d
 
-
 # fan_in_fan_out_map = {
 #     "Conv1D": True,
 #     "Linear": False,
@@ -94,6 +93,9 @@ class PEFTNet(_PEFTNet):
         # Add **kwargs to peft_kwargs to all keys in peft_kwargs
         for k, v in peft_kwargs.items():
             peft_kwargs[k] = {**v, **kwargs}
+
+        if ignore_regex == "" or not ignore_regex:
+            ignore_regex = None
 
         super().__init__(
             model,

@@ -1,13 +1,15 @@
 runs: 1
 seed: -1 # random seed
+hp_search: False # whether to run hyperparameter search
 train:
   epochs: 10
   lr: 1e-5
   batch_size: 32
   weight_decay: 1e-4
-  fp16: True
+  fp16: False
 pmodel:
   method: none # [loraconv2d, rosa, lora, none]
+  ignore_regex: ""
   rank: 4 # rank of trainable parameters [float in (0,1) or int]
 output:
   path: /home/mila/m/marawan.gamal/scratch/lora-tensor

@@ -1,0 +1,40 @@
+program: train_od_sweep.py
+method: bayes
+metric:
+  name: eval/AP-IoU=0.50-area=all-maxDets=100
+  goal: maximize
+parameters:
+  runs:
+    value: 1
+  seed:
+    value: -1 # random seed
+  hp_search:
+    value: False # whether to run hyperparameter search
+  train.epochs:
+    value: 10
+  train.lr:
+    min: 0.0000001
+    max: 0.001
+  train.batch_size:
+    values: [8, 16, 32]
+  train.weight_decay:
+    min: 0.0000001
+    max: 0.001
+  train.fp16:
+    value: True
+  pmodel.method:
+    value: none # [loraconv2d, rosa, lora, none]
+  pmodel.rank:
+    value: 4 # rank of trainable parameters [float in (0,1) or int]
+  output.path:
+    value:  /home/mila/m/marawan.gamal/scratch/lora-tensor
+  dataset.name:
+    value: cppe-5
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+
+# python train_od.py pmodel.method=loraconv2d pmodel.rank=4

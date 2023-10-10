@@ -2,16 +2,16 @@ import os
 import os.path as osp
 import time
 
-import wandb
+from tqdm import tqdm
 from typing import Optional, List, Dict
 
 import hydra
 import evaluate
+import wandb
 from datasets import Dataset
 from omegaconf import DictConfig, OmegaConf
 
 import torch
-from torch import nn
 from transformers import AutoModelForObjectDetection
 from transformers import TrainingArguments
 from transformers import Trainer
@@ -158,24 +158,12 @@ class CustomTrainer(Trainer):
         return results_total
 
 
-def wandb_hp_space(trial):
-    return {
-        "method": "random",
-        "metric": {"name": "objective", "goal": "maximize"},
-        "parameters": {
-            "learning_rate": {"distribution": "uniform", "min": 1e-6, "max": 1e-3},
-            "per_device_train_batch_size": {"values": [8, 16]},
-        },
-    }
-
-
 @hydra.main(version_base=None, config_path="configs", config_name="conf_od")
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
     print(OmegaConf.to_yaml(cfg))
 
-    # Initialize wandb
     wandb_config = OmegaConf.to_container(
         cfg, resolve=True, throw_on_missing=True
     )
@@ -194,6 +182,7 @@ def main(cfg: DictConfig):
         experiment_path = osp.join(experiment_path, "hp_search") if args['hp_search'] else experiment_path
         output_path = osp.join(experiment_path, experiment_name)
 
+        # Initialize wandb
         run = wandb.init(config=wandb_config, project="lora-tensor", name=experiment_name)
 
         if not osp.exists(output_path):
@@ -208,12 +197,14 @@ def main(cfg: DictConfig):
             ignore_mismatched_sizes=True
         )
 
+        print(model)
+
         # PEFT Model
         print("-" * 100)
         if args['pmodel']['method'].lower() != 'none':
             print(f"=> Training PEFTNet model: {args['pmodel']['method']}")
-            # cmodel = pn.PEFTNet(model, ignore_regex=".*conv(1|3).*", **args['pmodel'])
-            cmodel = pn.PEFTNet(model, **args['pmodel'])
+            cmodel = pn.PEFTNet(model, ignore_regex=".*conv(1|3).*", **args['pmodel'])
+            print(f"\n{cmodel.get_report()}\n")
             model = cmodel.peft_model
         else:
             print("=> Training baseline model")
@@ -221,37 +212,12 @@ def main(cfg: DictConfig):
         def model_init(trial):
             return model
 
-        # Make last layer trainable
-        for param in model.class_labels_classifier.parameters():
-            param.requires_grad = True
-        for param in model.bbox_predictor.parameters():
-            param.requires_grad = True
-
-        # Print model
-        print(model)
-        print(f"\n{pn.PEFTNet.get_report(model)}\n")
-
-        # Print ratio of different layer types to total number of layers
-        print(f"=> Ratio of different layer types to total number of layers:")
-        n_conv_params = 0
-        n_linear_params = 0
-        n_total_params = sum(p.numel() for p in model.parameters()) / 1e6  # in millions
-        n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6  # in millions
-
-        for name, module in model.named_modules():
-            # If primitive layer
-            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
-                if isinstance(module, nn.Conv2d) and any([k > 1 for k in module.kernel_size]):
-                    n_conv_params += module.weight.numel()
-                else:
-                    n_linear_params += module.weight.numel()
-
-        n_conv_params /= 1e6
-        n_linear_params /= 1e6
-        print(f"=> Total number of parameters: {n_total_params}")
-        print(f"=> # Conv2d params: {n_conv_params}M (ratio: {n_conv_params / n_total_params:.3f})")
-        print(f"=> # Linear params: {n_linear_params}M (ratio: {n_linear_params / n_total_params:.3f})")
-        print(f"=> # Trainable params: {n_trainable_params:.3f}M (ratio: {n_trainable_params / n_total_params:.3f})")
+        # Number of trainable parameters
+        total_params = sum(p.numel() for p in model.parameters()) / 1e6  # in millions
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6  # in millions
+        print(f"=> Number of trainable parameters: {trainable_params:.3f}M")
+        print(f"=> Total number of parameters: {total_params:.3f}M")
+        print(f"=> Ratio: {trainable_params / total_params:.3f}")
         print("-" * 100)
 
         training_args = TrainingArguments(
@@ -273,39 +239,17 @@ def main(cfg: DictConfig):
             fp16=args['train']['fp16']
         )
 
-        if args['hp_search']:
-            print("=> Running hyperparameter search")
-            trainer = CustomTrainer(
-                model=None,
-                args=training_args,
-                data_collator=lambda x: collate_fn(x, image_processor),
-                train_dataset=train_dataset,
-                eval_dataset=test_dataset,
-                tokenizer=image_processor,
-                model_init=model_init
-            )
-
-            best_trial = trainer.hyperparameter_search(
-                direction="maximize",
-                backend="wandb",
-                hp_space=wandb_hp_space,
-                n_trials=20,
-                compute_objective=compute_objective,
-            )
-            print(best_trial)
-
-        else:
-            print("=> Running training (no search)")
-            trainer = CustomTrainer(
-                model=model,
-                args=training_args,
-                data_collator=lambda x: collate_fn(x, image_processor),
-                train_dataset=train_dataset,
-                eval_dataset=test_dataset,
-                tokenizer=image_processor
-            )
-            trainer.train()
-            trainer.save_model(output_path)
+        print("=> Running training (no search)")
+        trainer = CustomTrainer(
+            model=model,
+            args=training_args,
+            data_collator=lambda x: collate_fn(x, image_processor),
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset,
+            tokenizer=image_processor
+        )
+        trainer.train()
+        trainer.save_model(output_path)
 
 
 if __name__ == "__main__":
