@@ -71,7 +71,7 @@ def evaluate_model(model, dataloader):
         return sum(losses) / len(losses)
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="conf_synthetic.yaml")
+@hydra.main(version_base=None, config_path="../configs", config_name="conf_synthetic.yaml")
 def main(cfg: DictConfig):
 
     # *** Configure HPs ***

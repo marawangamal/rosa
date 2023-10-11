@@ -231,3 +231,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         target = encoding["labels"][0]  # remove batch dimension
 
         return {"pixel_values": pixel_values, "labels": target}
+
+
+def flatten_list_of_lists(list_of_lists):
+    return [item for sublist in list_of_lists for item in sublist]

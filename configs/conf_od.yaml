@@ -10,6 +10,7 @@ train:
 pmodel:
   method: none # [loraconv2d, rosa, lora, none]
   ignore_regex: ""
+  conv_method: tucker # [cp, tucker]
   rank: 4 # rank of trainable parameters [float in (0,1) or int]
 output:
   path: /home/mila/m/marawan.gamal/scratch/lora-tensor

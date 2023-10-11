@@ -7,7 +7,7 @@ import evaluate
 from transformers import AutoModelForObjectDetection
 
 import peftnet as pn
-from utils_cv import get_dataloaders
+from utils.utils_cv import get_dataloaders
 from utils.utils import load_object
 
 import argparse

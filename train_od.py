@@ -1,6 +1,5 @@
 import os
 import os.path as osp
-import time
 
 import wandb
 from typing import Optional, List, Dict
@@ -17,14 +16,10 @@ from transformers import TrainingArguments
 from transformers import Trainer
 
 import peftnet as pn
-from utils_cv import collate_fn, get_dataloaders, coco_bbox_to_pascal_bbox
+from utils.utils_cv import collate_fn, get_dataloaders
 from utils.utils import  get_experiment_name, set_seeds, save_object
 
 # todo: vary bs
-# todo: stop removing invalid images / check num images
-
-import numpy as np
-from mean_average_precision import MetricBuilder
 
 # Load dataset
 checkpoint = "facebook/detr-resnet-50"
@@ -34,10 +29,6 @@ checkpoint = "facebook/detr-resnet-50"
     dataset='cppe-5',
     create_coco=True
 )
-
-
-def flatten_list_of_lists(list_of_lists):
-    return [item for sublist in list_of_lists for item in sublist]
 
 
 def compute_objective(metrics):
@@ -81,7 +72,6 @@ class CustomTrainer(Trainer):
         self._memory_tracker.start()
 
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
-        start_time = time.time()
 
         eval_loop = self.prediction_loop if self.args.use_legacy_prediction_loop else self.evaluation_loop
         output = eval_loop(
@@ -93,21 +83,6 @@ class CustomTrainer(Trainer):
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
         )
-
-        # total_batch_size = self.args.eval_batch_size * self.args.world_size
-        # if f"{metric_key_prefix}_jit_compilation_time" in output.metrics:
-        #     start_time += output.metrics[f"{metric_key_prefix}_jit_compilation_time"]
-
-        # output.metrics.update(
-        #     speed_metrics(
-        #         metric_key_prefix,
-        #         start_time,
-        #         num_samples=output.num_samples,
-        #         num_steps=math.ceil(output.num_samples / total_batch_size),
-        #     )
-        # )
-
-        # self.log(output.metrics) <--- commented out to log in the main function
 
         return output.metrics
 

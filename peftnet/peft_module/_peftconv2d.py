@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import tltorch
 
-from .tensorconv import CPConv2d
+from .tensorconv import CPConv2d, TuckerConv2d
 
 
 class PeftConv2d(nn.Module):
@@ -16,6 +16,7 @@ class PeftConv2d(nn.Module):
             stride: Union[int, tuple] = 1,
             padding: Union[int, tuple] = 0,
             rank: Union[int, float] = 1.0,
+            conv_method: str = 'cp',
             bias: bool = False,
             use_scale: bool = False,
             alpha: float = 32.0,
@@ -38,6 +39,7 @@ class PeftConv2d(nn.Module):
                 if 'same': rank is computed to keep the number of parameters (at most) the same
                 if float, computes a rank so as to keep rank percent of the original number of parameters
                 if int, just returns rank
+            conv_method: convolution method ['cp', 'tucker']
             bias: whether to include bias
             use_scale: whether to use scale factor
             alpha: scale factor
@@ -66,6 +68,7 @@ class PeftConv2d(nn.Module):
             "sample_method must be one of ['random', 'top', 'bottom']"
         assert init_method in ['zero', 'random'], "init_method must be one of ['zero', 'random']"
         assert adapt_method in ['ab', 'a', 'b'], "adapt_method must be one of ['ab', 'a', 'b']"
+        assert conv_method.lower() in ['cp', 'tucker'], "conv_method must be one of ['cp', 'tucker']"
     
         # Convolution parameters
         self.in_channels = in_channels
@@ -85,12 +88,18 @@ class PeftConv2d(nn.Module):
         self.init_method = init_method
         self.debug = debug
         self.fast_mode = fast_mode
+        self.conv_method = conv_method.lower()
 
         # Set requires_grad for a and b
         self.requires_grad_a = True if self.adapt_method in ['ab', 'a'] else False
         self.requires_grad_b = True if self.adapt_method in ['ab', 'b'] else False
 
-        self.w_hat_conv = CPConv2d(
+        factorized_conv_module = {
+            'cp': CPConv2d,
+            'tucker': TuckerConv2d
+        }[conv_method.lower()]
+
+        self.w_hat_conv = factorized_conv_module(
             self.in_channels, self.out_channels, self.kernel_size, bias=False, rank=self.rank,
             padding=self.padding, stride=self.stride
         )

@@ -2,7 +2,6 @@ import os
 import os.path as osp
 import time
 
-from tqdm import tqdm
 from typing import Optional, List, Dict
 
 import hydra
@@ -17,14 +16,11 @@ from transformers import TrainingArguments
 from transformers import Trainer
 
 import peftnet as pn
-from utils_cv import collate_fn, get_dataloaders, coco_bbox_to_pascal_bbox
+from utils.utils_cv import collate_fn, get_dataloaders
 from utils.utils import  get_experiment_name, set_seeds, save_object
 
 # todo: vary bs
 # todo: stop removing invalid images / check num images
-
-import numpy as np
-from mean_average_precision import MetricBuilder
 
 # Load dataset
 checkpoint = "facebook/detr-resnet-50"

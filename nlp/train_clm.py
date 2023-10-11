@@ -508,7 +508,7 @@ def train(args, pmodel, optimizer, lr_scheduler, train_dataloader, valid_dataloa
         logging.info("Sample: \n{}\nEND of Epoch\n=========\n".format(sample_str))
 
 
-@hydra.main(version_base=None, config_path="./configs", config_name="conf_clm")
+@hydra.main(version_base=None, config_path="../configs", config_name="conf_clm")
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
