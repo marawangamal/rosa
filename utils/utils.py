@@ -15,6 +15,20 @@ from enum import Enum
 import numpy as np
 
 
+def transform_dict(input_dict):
+    output_dict = {}
+
+    for key, value in input_dict.items():
+        keys_split = key.split('-')
+        temp_dict = output_dict
+
+        for sub_key in keys_split[:-1]:
+            temp_dict = temp_dict.setdefault(sub_key, {})
+
+        temp_dict[keys_split[-1]] = value
+    return output_dict
+
+
 class Summary(Enum):
     NONE = 0
     AVERAGE = 1

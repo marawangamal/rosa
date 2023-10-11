@@ -17,7 +17,7 @@ from transformers import Trainer
 
 import peftnet as pn
 from utils.utils_cv import collate_fn, get_dataloaders
-from utils.utils import  get_experiment_name, set_seeds, save_object
+from utils.utils import  get_experiment_name, set_seeds, save_object, transform_dict
 
 # todo: vary bs
 
@@ -148,12 +148,11 @@ def wandb_hp_space(trial):
 def main(cfg: DictConfig):
     # Experiment tracking and logging
     args = OmegaConf.to_container(cfg, resolve=True)
-    print(OmegaConf.to_yaml(cfg))
+    if args['override']:
+        args = transform_dict(args)
+        print("=> Overriding arguments")
 
-    # Initialize wandb
-    wandb_config = OmegaConf.to_container(
-        cfg, resolve=True, throw_on_missing=True
-    )
+    print(OmegaConf.to_yaml(cfg))
 
     for t in range(max(1, args["runs"])):
 
@@ -169,7 +168,7 @@ def main(cfg: DictConfig):
         experiment_path = osp.join(experiment_path, "hp_search") if args['hp_search'] else experiment_path
         output_path = osp.join(experiment_path, experiment_name)
 
-        run = wandb.init(config=wandb_config, project="lora-tensor", name=experiment_name)
+        run = wandb.init(name=experiment_name, config=args)
 
         if not osp.exists(output_path):
             os.makedirs(output_path)
@@ -237,37 +236,39 @@ def main(cfg: DictConfig):
             logging_strategy="steps",
             logging_steps=50,
             report_to='wandb',
+            resume_from_checkpoint=True,
             save_total_limit=4,
             prediction_loss_only=True,
             load_best_model_at_end=True,
             remove_unused_columns=False,
             per_device_train_batch_size=args['train']['batch_size'],
             num_train_epochs=args['train']['epochs'],
-            learning_rate=args['train']['lr'],
+            learning_rate=float(args['train']['lr']),
             weight_decay=args['train']['weight_decay'],
             fp16=args['train']['fp16']
         )
 
         if args['hp_search']:
-            print("=> Running hyperparameter search")
-            trainer = CustomTrainer(
-                model=None,
-                args=training_args,
-                data_collator=lambda x: collate_fn(x, image_processor),
-                train_dataset=train_dataset,
-                eval_dataset=test_dataset,
-                tokenizer=image_processor,
-                model_init=model_init
-            )
-
-            best_trial = trainer.hyperparameter_search(
-                direction="maximize",
-                backend="wandb",
-                hp_space=wandb_hp_space,
-                n_trials=20,
-                compute_objective=compute_objective,
-            )
-            print(best_trial)
+            # print("=> Running hyperparameter search")
+            # trainer = CustomTrainer(
+            #     model=None,
+            #     args=training_args,
+            #     data_collator=lambda x: collate_fn(x, image_processor),
+            #     train_dataset=train_dataset,
+            #     eval_dataset=test_dataset,
+            #     tokenizer=image_processor,
+            #     model_init=model_init
+            # )
+            #
+            # best_trial = trainer.hyperparameter_search(
+            #     direction="maximize",
+            #     backend="wandb",
+            #     hp_space=wandb_hp_space,
+            #     n_trials=20,
+            #     compute_objective=compute_objective,
+            # )
+            # print(best_trial)
+            pass
 
         else:
             print("=> Running training (no search)")

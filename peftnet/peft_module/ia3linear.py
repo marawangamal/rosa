@@ -61,7 +61,7 @@ class IA3Linear(nn.Module):
             self.bias.data = bias_init
 
     @classmethod
-    def from_module(cls, linear_layer: nn.Module, mode='in', fan_in_fan_out=True) -> nn.Module:
+    def from_module(cls, linear_layer: nn.Module, mode='in', fan_in_fan_out=True, *args, **kwargs) -> nn.Module:
         """Initialize from a nn.Linear/Conv1D module"""
 
         w = linear_layer.weight.data  # [out_f, in_f] or [in_f, out_f] if fan_in_fan_out

@@ -1,14 +1,15 @@
 runs: 1
 seed: -1 # random seed
 hp_search: False # whether to run hyperparameter search
+override: False # whether to override the sweepable params
 train:
   epochs: 10
-  lr: 1e-5
+  lr: 0.1
   batch_size: 32
   weight_decay: 1e-4
   fp16: False
 pmodel:
-  method: none # [loraconv2d, rosa, lora, none]
+  method: loraconv2d # [loraconv2d, rosa, lora, none]
   ignore_regex: ""
   conv_method: tucker # [cp, tucker]
   rank: 4 # rank of trainable parameters [float in (0,1) or int]
@@ -17,4 +18,8 @@ output:
 dataset:
   name: cppe-5
 
-# python train_od.py pmodel.method=loraconv2d pmodel.rank=4
+# Params that are sweepable (set `override=True` to override them)
+train-lr: 0.1
+train-batch_size: 32
+train-weight_decay: 1e-4
+pmodel-rank: 4

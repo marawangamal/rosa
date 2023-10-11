@@ -20,7 +20,8 @@ class PeftLinear(nn.Module):
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
             debug: bool = False,
-            fast_mode: bool = False
+            fast_mode: bool = False,
+            *args, **kwargs
     ):
         """ PEFT linear layer with trainable and fixed parameters in parallel.
 
