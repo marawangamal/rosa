@@ -16,7 +16,7 @@ from transformers import TrainingArguments
 from transformers import Trainer
 
 import peftnet as pn
-from utils.utils_cv import collate_fn, get_dataloaders
+from utils.utils_cv import collate_fn, get_dataloaders_od
 from utils.utils import  get_experiment_name, set_seeds, save_object, transform_dict
 
 # todo: vary bs
@@ -24,7 +24,7 @@ from utils.utils import  get_experiment_name, set_seeds, save_object, transform_
 # Load dataset
 checkpoint = "facebook/detr-resnet-50"
 (train_dataset, test_dataset, test_dataloader, test_ds_coco_format, test_dl_coco_format,
- image_processor, id2label, label2id) = get_dataloaders(
+ image_processor, id2label, label2id) = get_dataloaders_od(
     image_processor_checkpoint=checkpoint,
     dataset='cppe-5',
     create_coco=True
@@ -208,7 +208,9 @@ def main(cfg: DictConfig):
         # Print ratio of different layer types to total number of layers
         print(f"=> Ratio of different layer types to total number of layers:")
         n_conv_params = 0
+        n_trainable_conv_params = 0
         n_linear_params = 0
+        n_trainable_linear_params = 0
         n_total_params = sum(p.numel() for p in model.parameters()) / 1e6  # in millions
         n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6  # in millions
 
@@ -217,8 +219,10 @@ def main(cfg: DictConfig):
             if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
                 if isinstance(module, nn.Conv2d) and any([k > 1 for k in module.kernel_size]):
                     n_conv_params += module.weight.numel()
+                    n_trainable_conv_params += module.weight.numel() if module.weight.requires_grad else 0
                 else:
                     n_linear_params += module.weight.numel()
+                    n_trainable_linear_params += module.weight.numel() if module.weight.requires_grad else 0
 
         n_conv_params /= 1e6
         n_linear_params /= 1e6
@@ -226,7 +230,11 @@ def main(cfg: DictConfig):
         print(f"=> # Conv2d params: {n_conv_params}M (ratio: {n_conv_params / n_total_params:.3f})")
         print(f"=> # Linear params: {n_linear_params}M (ratio: {n_linear_params / n_total_params:.3f})")
         print(f"=> # Trainable params: {n_trainable_params:.3f}M (ratio: {n_trainable_params / n_total_params:.3f})")
-        print("-" * 100)
+
+        wandb.log({
+            "n_trainable_params": n_trainable_params,
+            "n_total_params": n_total_params,
+        })
 
         training_args = TrainingArguments(
             output_dir=output_path,

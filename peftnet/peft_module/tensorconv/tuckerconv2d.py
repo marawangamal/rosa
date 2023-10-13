@@ -19,7 +19,9 @@ class TuckerConv2d(nn.Module):
             bias: bool = True,
             stride: Union[int, Tuple[int, int]] = 1,
             padding: Union[int, Tuple[int, int]] = 0,
-            dilation: Union[int, Tuple[int, int]] = 1
+            dilation: Union[int, Tuple[int, int]] = 1,
+            init: str = 'zero',  # 'zero', 'svd', 'random'
+            *args, **kwargs
     ):
         super().__init__()
 
@@ -54,19 +56,30 @@ class TuckerConv2d(nn.Module):
                                           out_channels=self.out_channels, kernel_size=1, stride=1,
                                           padding=0, dilation=self.dilation, bias=bias)
 
+        if init.lower() == 'zero':
+            first = torch.zeros(self.in_channels, self.rank[0])
+            core = torch.ones(self.rank[0], self.rank[1], self.kernel_size[0], self.kernel_size[1])
+            last = torch.ones(self.out_channels, self.rank[1])
+            self.init_weights(first, core, last)
+        elif init.lower() == 'svd':
+            raise NotImplementedError
+        elif init.lower() == 'random':
+            pass
+        else:
+            raise ValueError(f"Unknown init method: {init}")
+
     def init_weights(self, first: torch.Tensor, core: torch.Tensor, last: torch.Tensor):
         """Initialize weights of the Tucker convolution.
 
         Args:
             first: [in_channels, ranks[0]]
+            last: [out_channels, ranks[1]]
             core: [ranks[0], ranks[1]]
-            last: [ranks[1], out_channels]
 
         """
-        self.first_layer.weight.data = \
-            torch.transpose(first, 1, 0).unsqueeze(-1).unsqueeze(-1)
+        self.first_layer.weight.data = torch.transpose(first, 1, 0).unsqueeze(-1).unsqueeze(-1)
         self.last_layer.weight.data = last.unsqueeze(-1).unsqueeze(-1)
-        self.core_layer.weight.data = core
+        self.core_layer.weight.data = core  # [out, in, kh, kw]
 
     @classmethod
     def estimate_ranks(cls, layer):

@@ -11,6 +11,7 @@ class PEFTNet(nn.Module):
             peft_map: dict,
             peft_kwargs: dict = None,
             ignore_regex: str = None,
+            ignore_list: list = None,
             *args, **kwargs
     ):
         """ Abstract class for PEFT models. PEFT models are models that can be factorized and merged.
@@ -20,6 +21,7 @@ class PEFTNet(nn.Module):
             peft_map: dictionary mapping module types to replacement modules
             peft_kwargs: dictionary mapping module types to kwargs for replacement modules
             ignore_regex: names of layers to ignore
+            ignore_list: list of layer names to ignore
 
         Notes:
             - Modules in `peft_map` dict will be replaced
@@ -30,6 +32,7 @@ class PEFTNet(nn.Module):
 
         # Set default values
         self.ignore_regex = ignore_regex
+        self.ignore_list = ignore_list if ignore_list is not None else []
         self.peft_map = peft_map
         self.peft_kwargs = peft_kwargs if peft_kwargs is not None else {k: dict() for k in peft_map.keys()}
 
@@ -44,8 +47,9 @@ class PEFTNet(nn.Module):
     def apply_peft(self) -> 'PEFTNet':
         """Replace linear modules with peft modules"""
         if self.ignore_regex is not None:
-            condition = lambda lyr, name: type(lyr).__name__ in self.peft_map.keys() and \
-                                          not bool(re.match(self.ignore_regex, name))
+            condition = lambda lyr, name: (type(lyr).__name__ in self.peft_map.keys()
+                                           and not bool(re.match(self.ignore_regex, name))
+                                           and name not in self.ignore_list)
         else:
             condition = lambda lyr, name: type(lyr).__name__ in self.peft_map.keys()
         replacement_function = lambda lyr: self.peft_map[type(lyr).__name__].from_module(

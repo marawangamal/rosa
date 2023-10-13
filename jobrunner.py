@@ -204,8 +204,8 @@ class SlurmJobManager:
                     totals[k] += 1
 
         totals_tbl = pd.DataFrame([totals])
+        print("-" * 100)
         print(totals_tbl.to_string(index=False))
-
 
 
 if __name__ == '__main__':

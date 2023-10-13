@@ -1,0 +1,20 @@
+program: train_od.py
+method: grid
+metric:
+  name: "eval/AP-IoU=0.50-area=all-maxDets=100"
+  goal: maximize
+
+# The hyperparameters to sweep over
+parameters:
+  train-lr:
+    values: [0.0005, 0.0001, 0.00005, 0.00001, 0.000005, 0.000001 ]
+  pmodel-rank:
+    values: [ 2, 4 ]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - "override=True"
+  - "pmodel.method=lora"

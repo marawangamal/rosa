@@ -3,25 +3,26 @@ seed: -1 # random seed
 hp_search: False # whether to run hyperparameter search
 override: False # whether to override the sweepable params
 train:
-  epochs: 10
-  lr: 0.1
-  batch_size: 8
-  weight_decay: 1e-4
+  epochs: 100
+  lr: 5e-5
+  batch_size: 16
   fp16: False
+  warmup_ratio: 0.1
 pmodel:
-  method: loraconv2d # [loraconv2d, rosa, lora, none]
+  method: none # [loraconv2d, rosa, lora, none]
   ignore_regex: ""
   conv_method: tucker # [cp, tucker]
   rank: 4 # rank of trainable parameters [float in (0,1) or int]
   bias_requires_grad: False # whether to train the bias
-output:
+  ignore: none # whether to only peft 1d convolutions (i.e. LoRA)
+output:  # output directory to save runs
   path: /home/mila/m/marawan.gamal/scratch/lora-tensor
 dataset:
-  name: cppe-5
+  name: Flowers102  # [Flowers102, Food101, CIFAR10, CIFAR100, TinyImageNet200, ImageNet]
+  root: /home/mila/m/marawan.gamal/scratch/datasets # path to dataset cache
 
 # Params that are sweepable (set `override=True` to override them)
-train-lr: 0.1
-train-batch_size: 32
-train-weight_decay: 1e-4
+train-lr: 5e-5
+train-batch_size: 16
 pmodel-rank: 4
 pmodel-ignore_regex: ""

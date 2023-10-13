@@ -1,9 +1,22 @@
 import torch
 import torch.nn as nn
+from typing import Union, Tuple
 
 
 class CPConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, bias=True, rank=1, stride=1, padding=0, dilation=1):
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: Union[int, Tuple[int, int]],
+            rank: int,
+            bias: bool = True,
+            stride: Union[int, Tuple[int, int]] = 1,
+            padding: Union[int, Tuple[int, int]] = 0,
+            dilation: Union[int, Tuple[int, int]] = 1,
+            init: str = 'zero',  # 'zero', 'svd', 'random',
+            *args, **kwargs
+    ):
         super().__init__()
 
         self.in_channels = in_channels
@@ -13,12 +26,28 @@ class CPConv2d(nn.Module):
         self.stride = stride
         self.padding = padding
         self.dilation = dilation
+        self.init = init
+
+        if self.init.lower() == 'zero':
+            last = torch.zeros(self.out_channels, self.rank)
+            first = torch.ones(self.in_channels, self.rank)
+            vertical = torch.ones(self.kernel_size[0], self.rank)
+            horizontal = torch.ones(self.kernel_size[1], self.rank)
+        elif self.init.lower() == 'svd':
+            raise NotImplementedError
+        elif self.init.lower() == 'random':
+            last = torch.rand(self.out_channels, self.rank)
+            first = torch.rand(self.in_channels, self.rank)
+            vertical = torch.rand(self.kernel_size[0], self.rank)
+            horizontal = torch.rand(self.kernel_size[1], self.rank)
+        else:
+            raise ValueError(f"init should be one of ['zero', 'svd', 'random'], received {self.init}")
 
         self.factors = nn.ParameterList([
-            nn.Parameter(torch.zeros(out_channels, rank)),      # last
-            nn.Parameter(torch.ones(in_channels, rank)),        # first
-            nn.Parameter(torch.ones(kernel_size[0], rank)),     # vertical
-            nn.Parameter(torch.ones(kernel_size[1], rank))      # horizontal
+            nn.Parameter(last),      # last
+            nn.Parameter(first),        # first
+            nn.Parameter(vertical),     # vertical
+            nn.Parameter(horizontal)      # horizontal
         ])
 
         self.bias = nn.Parameter(torch.zeros(out_channels), requires_grad=bias) if bias else None

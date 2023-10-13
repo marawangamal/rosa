@@ -17,6 +17,7 @@ class PeftConv2d(nn.Module):
             padding: Union[int, tuple] = 0,
             rank: Union[int, float] = 1.0,
             conv_method: str = 'cp',
+            conv_init: str = 'zero',  # 'zero', 'svd', 'random'
             bias: bool = False,
             use_scale: bool = False,
             alpha: float = 32.0,
@@ -69,6 +70,7 @@ class PeftConv2d(nn.Module):
         assert init_method in ['zero', 'random'], "init_method must be one of ['zero', 'random']"
         assert adapt_method in ['ab', 'a', 'b'], "adapt_method must be one of ['ab', 'a', 'b']"
         assert conv_method.lower() in ['cp', 'tucker'], "conv_method must be one of ['cp', 'tucker']"
+        assert conv_init.lower() in ['zero', 'svd', 'random'], "conv_init must be one of ['zero', 'svd', 'random']"
     
         # Convolution parameters
         self.in_channels = in_channels
@@ -89,6 +91,7 @@ class PeftConv2d(nn.Module):
         self.debug = debug
         self.fast_mode = fast_mode
         self.conv_method = conv_method.lower()
+        self.conv_init = conv_init.lower()
 
         # Set requires_grad for a and b
         self.requires_grad_a = True if self.adapt_method in ['ab', 'a'] else False
@@ -101,7 +104,7 @@ class PeftConv2d(nn.Module):
 
         self.w_hat_conv = factorized_conv_module(
             self.in_channels, self.out_channels, self.kernel_size, bias=False, rank=self.rank,
-            padding=self.padding, stride=self.stride
+            padding=self.padding, stride=self.stride, init=self.conv_init
         )
 
         self.w_conv = nn.Conv2d(

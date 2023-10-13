@@ -68,6 +68,7 @@ class PEFTNet(_PEFTNet):
             peft_map: dict = None,
             peft_kwargs: dict = None,
             ignore_regex: str = None,
+            ignore_list: list = None,
             *args, **kwargs
     ):
         """ PEFT model for efficient adaptation of linear layers
@@ -77,6 +78,7 @@ class PEFTNet(_PEFTNet):
             method: {'rosa', 'lora', 'ia3', 'loraconv2d'}
             target_modules: names of modules types to peft {'Linear', 'Conv2d'}. Default: ['Linear']
             ignore_regex: regex to match layers to ignore (e.g. ['bert.embeddings'])
+            ignore_list: list of layers to ignore (e.g. [bert.embeddings])
 
         Notes:
             - only modules types in `factorize_list` will be factorized
@@ -102,4 +104,5 @@ class PEFTNet(_PEFTNet):
             peft_map=peft_map,
             peft_kwargs=peft_kwargs,
             ignore_regex=ignore_regex,
+            ignore_list=ignore_list if ignore_list else [],
         )

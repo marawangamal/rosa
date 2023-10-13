@@ -5,10 +5,15 @@ import numpy as np
 import torch
 import torchvision
 from datasets import load_dataset
+from datasets import Dataset
 from transformers import AutoImageProcessor
 
-import albumentations
+from transformers import DefaultDataCollator
 
+import albumentations
+from torchvision.transforms import RandomResizedCrop, Compose, Normalize, ToTensor
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
 
 def coco_bbox_to_pascal_bbox(bbox, img_dims=(1, 1)):
     """Convert normalized [x-top-left, y-top-left, width, height] to normalized [xmin, ymin, xmax, ymax].
@@ -31,7 +36,7 @@ def coco_bbox_to_pascal_bbox(bbox, img_dims=(1, 1)):
     xmax = xmin + (width * img_width)
     ymax = ymin + (height * img_height)
 
-    normalized_bbox = [xmin/img_width, ymin/img_height, xmax/img_width, ymax/img_height]
+    normalized_bbox = [xmin / img_width, ymin / img_height, xmax / img_width, ymax / img_height]
 
     return normalized_bbox
 
@@ -112,9 +117,8 @@ def transform_aug_ann(examples, image_processor, apply_aug=True):
     return image_processor(images=images, annotations=targets, return_tensors="pt")
 
 
-def get_dataloaders(image_processor_checkpoint="facebook/detr-resnet-50", dataset="cppe-5", create_coco=False,
-                    coco_path=os.getcwd()):
-
+def get_dataloaders_od(image_processor_checkpoint="facebook/detr-resnet-50", dataset="cppe-5", create_coco=False,
+                       coco_path=os.getcwd()):
     image_processor = AutoImageProcessor.from_pretrained(image_processor_checkpoint)
     train_dataset = load_dataset(dataset, split="train")
 
@@ -235,3 +239,105 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
 def flatten_list_of_lists(list_of_lists):
     return [item for sublist in list_of_lists for item in sublist]
+
+
+# Image Classification
+class DictDataset(torch.utils.data.Dataset):
+    def __init__(self, root, split, name="Flowers102", transform=torchvision.transforms.ToTensor()):
+
+        assert name in ["Flowers102"], "Dataset not supported"
+
+        dataset_obj = getattr(torchvision.datasets, name)
+        self.dataset = dataset_obj(
+            root=root, split=split, download=True, transform=transform
+        )
+        self.labels = set([item[1] for item in self.dataset])
+
+    def __getitem__(self, idx):
+        return {"pixel_values": self.dataset[idx][0], "label": self.dataset[idx][1]}
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+dataset_to_split = {
+    "Flowers102": {
+        "train": "train]",
+        "test": "val",
+    },
+    "StanfordCars": {
+        "train": "train",
+        "test": "test",
+    },
+    "FGVCAircraft": {
+        "train": "train",
+        "test": "val",
+    }
+}
+
+
+def get_dataloaders_ic(
+        root=os.getcwd(),
+        name="Flowers102",
+        image_processor_checkpoint="microsoft/resnet-50",
+):
+    # transform = transforms.Compose([
+    #     transforms.RandomHorizontalFlip(),  # Randomly flip the image horizontally
+    #     transforms.RandomCrop(32, padding=4),  # Randomly crop the image and pad it
+    #     transforms.ToTensor(),  # Convert PIL image to PyTorch tensor
+    #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    # ])
+
+    image_processor = AutoImageProcessor.from_pretrained(image_processor_checkpoint)
+    normalize = Normalize(mean=image_processor.image_mean, std=image_processor.image_std)
+    size = (
+        image_processor.size["shortest_edge"]
+        if "shortest_edge" in image_processor.size
+        else (image_processor.size["height"], image_processor.size["width"])
+    )
+    _transforms = Compose([RandomResizedCrop(size), ToTensor(), normalize])
+
+    train_dataset = DictDataset(root=root, split=dataset_to_split[name]["train"], name=name, transform=_transforms)
+    test_dataset = DictDataset(root=root, split=dataset_to_split[name]["test"], name=name, transform=_transforms)
+
+    labels = train_dataset.labels
+
+    label2id, id2label = dict(), dict()
+    for i, label in enumerate(labels):
+        label2id[label] = str(i)
+        id2label[str(i)] = label
+
+    data_collator = DefaultDataCollator()
+
+    return train_dataset, test_dataset, data_collator, image_processor, id2label, label2id, labels
+
+
+def get_dataloaders_ic_hf(image_processor_checkpoint="microsoft/resnet-50", dataset_name="food101", split="train[:5000]"):
+
+    dataset = load_dataset(dataset_name, split=split)
+    dataset = dataset.train_test_split(test_size=0.2)
+    labels = dataset["train"].features["label"].names
+    label2id, id2label = dict(), dict()
+    for i, label in enumerate(labels):
+        label2id[label] = str(i)
+        id2label[str(i)] = label
+
+    image_processor = AutoImageProcessor.from_pretrained(image_processor_checkpoint)
+
+    normalize = Normalize(mean=image_processor.image_mean, std=image_processor.image_std)
+    size = (
+        image_processor.size["shortest_edge"]
+        if "shortest_edge" in image_processor.size
+        else (image_processor.size["height"], image_processor.size["width"])
+    )
+    _transforms = Compose([RandomResizedCrop(size), ToTensor(), normalize])
+
+    def transforms(examples):
+        examples["pixel_values"] = [_transforms(img.convert("RGB")) for img in examples["image"]]
+        del examples["image"]
+        return examples
+
+    dataset = dataset.with_transform(transforms)
+    data_collator = DefaultDataCollator()
+
+    return dataset['train'], dataset['test'], data_collator, image_processor, id2label, label2id, labels
