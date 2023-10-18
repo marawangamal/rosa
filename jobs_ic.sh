@@ -25,18 +25,19 @@
 #python train_ic.py pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-3
 #python train_ic.py pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-4
 #python train_ic.py pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-5
-#
+
 ## rank 4
 #python train_ic.py pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-3
 #python train_ic.py pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-4
 #python train_ic.py pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-5
 
 # rank 2
-python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-3
-python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-4
-python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-5
+#python train_ic.py dataset.name=FGVCAircraft pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-4
+#python train_ic.py dataset.name=FGVCAircraft pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-3
+#python train_ic.py dataset.name=FGVCAircraft pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-5
+#python train_ic.py dataset.name=FGVCAircraft pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-3
 
 # rank 4
-python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-3
-python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-4
-python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-5
+#python train_ic.py dataset.name=FGVCAircraft pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=4 train.lr=5e-3
+#python train_ic.py dataset.name=FGVCAircraft pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=4 train.lr=5e-4
+#python train_ic.py dataset.name=FGVCAircraft pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=4 train.lr=5e-5

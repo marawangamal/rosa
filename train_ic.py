@@ -25,6 +25,7 @@ accuracy = evaluate.load("accuracy")
 # https://huggingface.co/microsoft/resnet-50
 # https://huggingface.co/docs/transformers/tasks/image_classification
 
+
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     predictions = np.argmax(predictions, axis=1)
@@ -154,6 +155,7 @@ def main(cfg: DictConfig):
             report_to='wandb',
             remove_unused_columns=False,
             evaluation_strategy="epoch",
+            eval_steps=5,
             save_strategy="epoch",
             learning_rate=args['train']['lr'],
             per_device_train_batch_size=16,

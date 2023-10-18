@@ -17,17 +17,54 @@ common_preamble_runs:
   - source /home/mila/m/marawan.gamal/.venv/rosa/bin/activates
 
 groups:
-
+#https://github.com/lucidrains/imagen-pytorch
 # ================================
 # IMAGE CLASSIFICATION EXPERIMENTS
 # ================================
 
+#  - name: StanfordCars | ResNet50 (peft-method, rank, lr)
+#    preamble:
+#      - "#SBATCH --gres=gpu:1"
+#      - "#SBATCH --time=3:00:00"
+#    paralleljobs:
+#      - python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-3
+#      - python train_ic.py pmodel.method=loraconv2d pmodel.ignore=only1d pmodel.rank=2 train.lr=5e-5
+#      - python train_ic.py pmodel.method=loraconv2d pmodel.rank=2 train.lr=5e-4
+
   - name: StanfordCars | ResNet50 (peft-method, rank, lr)
     preamble:
       - "#SBATCH --gres=gpu:1"
-      - "#SBATCH --time=3:00:00"
+#      - "#SBATCH --time=24:00:00"
+#      - "#SBATCH --partition=unkillable"
     paralleljobs:
-      - python train_ic.py dataset.name=StanfordCars pmodel.method=none train.lr=5e-4
-      - python train_ic.py dataset.name=StanfordCars pmodel.method=last train.lr=5e-3
-      - python train_ic.py dataset.name=StanfordCars pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-3
-      - python train_ic.py dataset.name=StanfordCars pmodel.method=loraconv2d train.lr=5e-3
+# rank=2
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=none train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=none train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=none train.lr=5e-5
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=last train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=last train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=last train.lr=5e-5
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-5
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=loraconv2d train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=loraconv2d train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=2 pmodel.method=loraconv2d train.lr=5e-5
+# rank=4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=4 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=4 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=4 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-5
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=4 pmodel.method=loraconv2d train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=4 pmodel.method=loraconv2d train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=4 pmodel.method=loraconv2d train.lr=5e-5
+# rank=8
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=8 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=8 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=8 pmodel.ignore=only1d pmodel.method=loraconv2d train.lr=5e-5
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=8 pmodel.method=loraconv2d train.lr=5e-3
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=8 pmodel.method=loraconv2d train.lr=5e-4
+      - python train_ic.py dataset.name=FGVCAircraft pmodel.rank=8 pmodel.method=loraconv2d train.lr=5e-5
+
+
+
+

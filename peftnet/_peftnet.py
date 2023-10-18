@@ -51,7 +51,8 @@ class PEFTNet(nn.Module):
                                            and not bool(re.match(self.ignore_regex, name))
                                            and name not in self.ignore_list)
         else:
-            condition = lambda lyr, name: type(lyr).__name__ in self.peft_map.keys()
+            condition = lambda lyr, name: type(lyr).__name__ in self.peft_map.keys() and name not in self.ignore_list
+
         replacement_function = lambda lyr: self.peft_map[type(lyr).__name__].from_module(
             lyr, **self.peft_kwargs[type(lyr).__name__]
         )

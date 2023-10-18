@@ -242,10 +242,28 @@ def flatten_list_of_lists(list_of_lists):
 
 
 # Image Classification
+
+dataset_to_split = {
+    "Flowers102": {
+        "train": "train",
+        "test": "val",
+    },
+    "StanfordCars": {
+        "train": "train",
+        "test": "test",
+    },
+    "FGVCAircraft": {
+        "train": "train",
+        "test": "val",
+    }
+}
+
+
 class DictDataset(torch.utils.data.Dataset):
     def __init__(self, root, split, name="Flowers102", transform=torchvision.transforms.ToTensor()):
 
-        assert name in ["Flowers102"], "Dataset not supported"
+        assert name in dataset_to_split.keys(), \
+            f"Dataset {name} not supported. Only {dataset_to_split.keys()} are supported."
 
         dataset_obj = getattr(torchvision.datasets, name)
         self.dataset = dataset_obj(
@@ -258,22 +276,6 @@ class DictDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.dataset)
-
-
-dataset_to_split = {
-    "Flowers102": {
-        "train": "train]",
-        "test": "val",
-    },
-    "StanfordCars": {
-        "train": "train",
-        "test": "test",
-    },
-    "FGVCAircraft": {
-        "train": "train",
-        "test": "val",
-    }
-}
 
 
 def get_dataloaders_ic(
