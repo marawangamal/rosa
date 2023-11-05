@@ -1,9 +1,10 @@
 runs: 1
 seed: -1
 debug: True
+print_freq: 100
 train:
   epochs: 10
-  lr: 2.0e-05
+  lr: 2e-05
   batch_size: 16
   fraction: 1.0
   seq_len: 512
@@ -19,31 +20,22 @@ train:
     params: {}
 model:
   name: roberta-base
-fnmodel:
-  name: none
+pnmodel:
+  name: none # ["none", "lora", "rosa"]
   factorize_freq: 1  # factorize every n epochs
   factorize_level: epoch  # ["epoch", "batch"]
   ignore_list: True # use predefined `ignore_list` consisting pf 'mlp'
   params:
     rank: 1
-    adapt_method: none  # ["a", "b", "ab"]
+    adapt_method: ab  # ["a", "b", "ab"]
     sample_method: random  # ["random", "top", "bottom"]
     factorize_method: equal # ["equal", "add"]  (w \gets usv1 + usv2  vs.  w \gets w + usv2)
     use_scale: False  # scale factorization by rank
     bias_requires_grad: False  # whether to optimize bias
     fast_mode: False  # use fast mode
-logging:
-  print_freq: 100
-  eval_freq: 100  # log every n batches
-  eval_level: epoch  # ["epoch", "batch"]
-  input_size: [4, 512]  # used to compute latency [batch_size, seq_len]
-  memory_info: True
 output:
-  path: /home/mila/m/marawan.gamal/scratch/rosa/runs
+  path: /home/mila/m/marawan.gamal/scratch/rosa/runs  # path to save outputs/checkpoints
 dataset:
   name: glue
   task_name: cola
-  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
-eval:
-  batch_size: 16
-  experiment: runs/glue/cola/roberta-base_factorized_0.01_epoch_random_1.0_5e-05_5_1
+  cache: /home/mila/m/marawan.gamal/scratch/hf_cache  # path to save dataset

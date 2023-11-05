@@ -3,3 +3,5 @@
 dataset:
   name: glue
   task_name: cola
+train:
+  batch_size: 32

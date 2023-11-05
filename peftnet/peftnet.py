@@ -76,13 +76,14 @@ class PEFTNet(_PEFTNet):
         Args:
             model: model to be factorized
             method: {'rosa', 'lora', 'ia3', 'loraconv2d'}
-            target_modules: names of modules types to peft {'Linear', 'Conv2d'}. Default: ['Linear']
+            peft_map: dict of {module_type_classname: replacement_module}
+            peft_kwargs: dict of {module_type_classname: kwargs} to pass to replacement module
             ignore_regex: regex to match layers to ignore (e.g. ['bert.embeddings'])
-            ignore_list: list of layers to ignore (e.g. [bert.embeddings])
+            ignore_list: list of names of layers to ignore (e.g. [bert.embeddings])
 
         Notes:
-            - only modules types in `factorize_list` will be factorized
-            - kwargs are passed to replacement module `from_module` method
+            - only modules types in `peft_map` will be factorized
+            - peft_kwargs are passed to the replacement_module `from_module` method
 
         Warning:
             If `model` has both Linear and Conv1D layers, this will cause an error

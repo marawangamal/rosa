@@ -92,13 +92,13 @@ groups:
 #      - python train_clm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan model.name=gpt2-medium fnmodel.name=rosa fnmodel.params.rank=4 fnmodel.params.factorize_mode=bottom train.lr=2e-2
 
 
-  - name: GLUE | COLA | Roberta-Base (peft-method, lr, adapt_method)
-    preamble:
-      - "#SBATCH --gres=gpu:2"
-      - "#SBATCH --time=8:00:00"
-    paralleljobs:
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=2 fnmodel.params.adapt_method=a train.lr=2e-4
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.adapt_method=a train.lr=2e-3
+#  - name: GLUE | COLA | Roberta-Base (peft-method, lr, adapt_method)
+#    preamble:
+#      - "#SBATCH --gres=gpu:2"
+#      - "#SBATCH --time=8:00:00"
+#    paralleljobs:
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 fnmodel.name=lora +task=cola fnmodel.params.rank=2 fnmodel.params.adapt_method=a train.lr=2e-4
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=2 fnmodel.params.adapt_method=a train.lr=2e-3
 
 
         #  - name: GLUE | COLA | Roberta-Base (peft-method, rank, lr)
@@ -118,6 +118,25 @@ groups:
 # ==========================
 # GLUE BENCHMARK EXPERIMENTS
 # ==========================
+
+  - name: GLUE | COLA | Roberta-Base (peft_method, rank, factorization_freq, factorize_mode)
+    preamble:
+      - "#SBATCH --gres=gpu:1"
+      - "#SBATCH --partition=unkillable"
+    paralleljobs:
+# baseline
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan seed=42 train.lr=2e-5
+# rank2
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=lora pnmodel.params.rank=2 train.lr=2e-2
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=lora pnmodel.params.rank=2 train.lr=2e-3
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=lora pnmodel.params.rank=2 train.lr=2e-4
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=lora pnmodel.params.rank=2 pnmodel.params.factorize_method=random train.lr=2e-2
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=lora pnmodel.params.rank=2 pnmodel.params.factorize_method=random train.lr=2e-3
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=lora pnmodel.params.rank=2 pnmodel.params.factorize_method=random train.lr=2e-4
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=rosa pnmodel.params.rank=2 train.lr=2e-2
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=rosa pnmodel.params.rank=2 train.lr=2e-3
+      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface seed=42 +profile=marawan +task=cola pnmodel.name=rosa pnmodel.params.rank=2 train.lr=2e-4
+
 
 #  - name: GLUE | COLA | Roberta-Base (peft_method, rank, factorization_freq, factorize_mode)
 #    preamble:
@@ -178,20 +197,20 @@ groups:
 #      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=8 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-4
 #      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 fnmodel.name=rosa +task=cola fnmodel.params.rank=8 fnmodel.factorize_freq=20 fnmodel.params.factorize_method=add train.lr=2e-5
 
-  - name: GLUE | COLA | Roberta-Base (peft_method, rank, factorization_freq, factorize_mode)
-    preamble:
-      - "#SBATCH --gres=gpu:1"
-      - "#SBATCH --partition=unkillable"
-    paralleljobs:
-# baseline
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=1
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=2
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=3
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=4
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=1
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=2
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=3
-      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=4
+#  - name: GLUE | COLA | Roberta-Base (peft_method, rank, factorization_freq, factorize_mode)
+#    preamble:
+#      - "#SBATCH --gres=gpu:1"
+#      - "#SBATCH --partition=unkillable"
+#    paralleljobs:
+## baseline
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=1
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=2
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=3
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=8 train.lr=2e-3 fnmodel.factorize_freq=4
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=1
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=2
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=3
+#      - python train_mlm.py dataset.cache=$SLURM_TMPDIR/huggingface +profile=marawan runs=3 seed=42 +task=cola fnmodel.name=rosa fnmodel.params.bias_requires_grad=False fnmodel.params.rank=2 train.lr=2e-3 fnmodel.factorize_freq=4
 
 #
 #  - name: GLUE | QNLI | Roberta-Base (peft-method, rank, lr)

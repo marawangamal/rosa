@@ -3,4 +3,4 @@
 output:
   path: /home/mila/m/marawan.gamal/scratch/rosa/runs
 dataset:
-  cache: /home/mila/m/marawan.gamal/scratch/hf_cache
+  cache: $SLURM_TMPDIR/huggingface

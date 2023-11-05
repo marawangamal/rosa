@@ -15,7 +15,7 @@ class PeftLinear(nn.Module):
             use_scale: bool = False,
             alpha: float = 32.0,
             adapt_method: str = 'ab',  # 'ab', 'a', 'b'
-            sample_method: str = 'random',
+            sample_method: str = 'random',  # 'random', 'top', 'bottom'
             factorize_method: str = 'equal',  # 'equal', 'add'
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
@@ -34,7 +34,10 @@ class PeftLinear(nn.Module):
             alpha: scale factor
             adapt_method: which parameters to adapt [`ab`, `a`, `b`] (default: `ab`)
             sample_method: sample method [`random`, `top`, `bottom`]
-            factorize_method: factorize method `w` \gets usv_1 + usv_2  (equal) or `w` \gets w + usv_2 (add)
+            factorize_method: factorize method [`equal`, `add`, `random`] (default: `equal`)
+                - 'equal': updates the weight as `w` \\gets `usv_1` + `usv_2`
+                - 'add': updates the weight as `w` \\gets `w` + `usv_2`
+                - 'random': updates the weight as `w` \\gets `w` + `random_low_rank_mat` (LoRA with resampling)
             init_method: initialization method for `a` [`zero`, `random`]
             debug: whether to use debug mode
 
@@ -52,7 +55,8 @@ class PeftLinear(nn.Module):
         assert isinstance(bias, bool), "bias must be a boolean"
         assert isinstance(use_scale, bool), "use_scale must be a boolean"
         assert isinstance(alpha, (int, float)), "alpha must be an integer or a float"
-        assert factorize_method in ['equal', 'add'], "factorize_method must be one of ['equal', 'add']"
+        assert factorize_method in ['equal', 'add', 'random'], \
+            "factorize_method must be one of ['equal', 'add', 'random']"
         assert sample_method in ['random', 'top', 'bottom'], \
             "sample_method must be one of ['random', 'top', 'bottom']"
         assert init_method in ['zero', 'random'], "init_method must be one of ['zero', 'random']"
@@ -80,7 +84,6 @@ class PeftLinear(nn.Module):
         self.b = nn.Parameter(torch.randn(self.rank, out_features), requires_grad=self.requires_grad_b)
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
-
 
     def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
                            bias_init: torch.Tensor = None):
@@ -134,7 +137,7 @@ class PeftLinear(nn.Module):
         """Merge `a` and `b` with `w` and make `w` trainable"""
         if not self.merged.item():
             # Merge w and ab
-            self.w.data = (self.alpha/self.rank) * self.a.data @ self.b.data + self.w.data if self.use_scale \
+            self.w.data = (self.alpha / self.rank) * self.a.data @ self.b.data + self.w.data if self.use_scale \
                 else self.a.data @ self.b.data + self.w.data
 
             # todo: empty a and b tensors to save memory
@@ -156,33 +159,42 @@ class PeftLinear(nn.Module):
             rank_upper_bound = min(self.w.shape)
             if self.rank >= rank_upper_bound:
                 # If rank is larger than the rank upper bound, train the whole layer
+                logging.warning(f"Rank {self.rank} is larger than the rank upper bound {rank_upper_bound}."
+                                f" Factorization skipped.")
                 return self
 
-            # Factorize
-            u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
-            a = s.reshape(1, -1) * u
-            b = vt
-            w_hat = a @ b
-
-            # Check reconstruction error
-            if not self.fast_mode:
-                assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
-            trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.sample_method)
-
-            # Set trainable and fixed parameters
-            init_a_trainable = a[:, trainable_indices]  # [in_f, r']
-            init_b_trainable = b[trainable_indices, :]  # [r', out_f]
-            init_a_fixed = a[:, fixed_indices]
-            init_b_fixed = b[fixed_indices, :]
-
-            if self.factorize_method == 'equal':
-                init_w = init_a_fixed @ init_b_fixed
-            elif self.factorize_method == 'add':
+            if self.factorize_method == 'random':
+                # Add random ab in parallel with w
+                init_a_trainable = torch.randn(self.in_features, self.rank, device=self.w.device)
+                init_b_trainable = torch.randn(self.rank, self.out_features, device=self.w.device)
                 init_w = self.w.data
             else:
-                raise AttributeError(
-                    f"Unknown factorize method: {self.factorize_method}. Method must be one of ['equal', 'add']"
-                )
+                # Factorize
+                u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
+                a = s.reshape(1, -1) * u
+                b = vt
+                w_hat = a @ b
+
+                # Check reconstruction error
+                if not self.fast_mode:
+                    assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
+                trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound,
+                                                                         mode=self.sample_method)
+
+                # Set trainable and fixed parameters
+                init_a_trainable = a[:, trainable_indices]  # [in_f, r']
+                init_b_trainable = b[trainable_indices, :]  # [r', out_f]
+                init_a_fixed = a[:, fixed_indices]
+                init_b_fixed = b[fixed_indices, :]
+
+                if self.factorize_method == 'equal':
+                    init_w = init_a_fixed @ init_b_fixed
+                elif self.factorize_method == 'add':
+                    init_w = self.w.data
+                else:
+                    raise AttributeError(
+                        f"Unknown factorize method: {self.factorize_method}. Method must be one of ['equal', 'add']"
+                    )
 
             # Initialize
             self.a.data = init_a_trainable
@@ -269,7 +281,7 @@ class PeftLinear(nn.Module):
                 else (x @ self.ab) + x @ self.w
         else:
             # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
-            a = (self.alpha/self.rank) * self.a if self.use_scale else self.a
+            a = (self.alpha / self.rank) * self.a if self.use_scale else self.a
             return (x @ a) @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
                 else (x @ a) @ self.b + x @ self.w
 
@@ -349,7 +361,6 @@ class PeftLinearDebug(nn.Module):
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
 
-
     def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
                            bias_init: torch.Tensor = None):
         """Initialize weights and biases with given tensors."""
@@ -401,7 +412,7 @@ class PeftLinearDebug(nn.Module):
         """Merge `a` and `b` with `w` and make `w` trainable"""
         if not self.merged.item():
             # Merge w and ab
-            self.w.data = (self.alpha/self.rank) * self.a.data @ self.b.data + self.w.data if self.use_scale \
+            self.w.data = (self.alpha / self.rank) * self.a.data @ self.b.data + self.w.data if self.use_scale \
                 else self.a.data @ self.b.data + self.w.data
 
             # todo: empty a and b tensors to save memory
@@ -433,7 +444,7 @@ class PeftLinearDebug(nn.Module):
 
             # Check reconstruction error
             # if not self.fast_mode:
-                # assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
+            # assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
             # trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.sample_method)
 
             # Set trainable and fixed parameters
@@ -542,7 +553,7 @@ class PeftLinearDebug(nn.Module):
                 else (x @ self.ab) + x @ self.w
         else:
             # [*, in_features] @ [in_features, rank] @ [rank, out_features] + [out_features, 1] = [*, out_features]
-            a = (self.alpha/self.rank) * self.a if self.use_scale else self.a
+            a = (self.alpha / self.rank) * self.a if self.use_scale else self.a
             return (x @ a) @ self.b + x @ self.w + self.bias.reshape(-1) if self.bias is not None \
                 else (x @ a) @ self.b + x @ self.w
 
