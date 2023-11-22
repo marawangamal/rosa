@@ -17,7 +17,7 @@ model:
   params:
     hidden_size: 64
     bias: False
-output: /home/mila/m/marawan.gamal/projects/rosa/outputs
+output: /home/mila/m/marawan.gamal/projects/rosa/figures-old
 log_freq: 5000  # print every n batches
 data:
   in_f: 512

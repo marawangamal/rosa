@@ -16,7 +16,7 @@ class PeftLinear(nn.Module):
             alpha: float = 32.0,
             adapt_method: str = 'ab',  # 'ab', 'a', 'b'
             sample_method: str = 'random',
-            factorize_method: str = 'equal',  # 'equal', 'add'
+            factorize_method: str = 'equal',  # 'equal', 'add', 'random'
             init_method: str = 'zero',  # 'zero', 'random'
             bias_requires_grad: bool = True,
             debug: bool = False,
@@ -51,7 +51,8 @@ class PeftLinear(nn.Module):
         assert isinstance(bias, bool), "bias must be a boolean"
         assert isinstance(use_scale, bool), "use_scale must be a boolean"
         assert isinstance(alpha, (int, float)), "alpha must be an integer or a float"
-        assert factorize_method in ['equal', 'add'], "factorize_method must be one of ['equal', 'add']"
+        assert factorize_method in ['equal', 'add', 'random'], \
+            "factorize_method must be one of ['equal', 'add', 'random']"
         assert sample_method in ['random', 'top', 'bottom'], \
             "sample_method must be one of ['random', 'top', 'bottom']"
         assert init_method in ['zero', 'random'], "init_method must be one of ['zero', 'random']"
@@ -79,7 +80,6 @@ class PeftLinear(nn.Module):
         self.b = nn.Parameter(torch.randn(self.rank, out_features), requires_grad=self.requires_grad_b)
         self.w = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
         self.register_buffer('merged', torch.tensor([False]))
-
 
     def initialize_weights(self, a_init: torch.Tensor = None, b_init: torch.Tensor = None, w_init: torch.Tensor = None,
                            bias_init: torch.Tensor = None):
@@ -156,31 +156,37 @@ class PeftLinear(nn.Module):
                 # If rank is larger than the rank upper bound, train the whole layer
                 return self
 
-            # Factorize
-            u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
-            a = s.reshape(1, -1) * u
-            b = vt
-            w_hat = a @ b
-
-            # Check reconstruction error
-            if not self.fast_mode:
-                assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
-            trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.sample_method)
-
-            # Set trainable and fixed parameters
-            init_a_trainable = a[:, trainable_indices]  # [in_f, r']
-            init_b_trainable = b[trainable_indices, :]  # [r', out_f]
-            init_a_fixed = a[:, fixed_indices]
-            init_b_fixed = b[fixed_indices, :]
-
-            if self.factorize_method == 'equal':
-                init_w = init_a_fixed @ init_b_fixed
-            elif self.factorize_method == 'add':
+            if self.factorize_method == 'random':
+                init_a_trainable = torch.zeros(self.in_features, self.rank, device=self.w.device)
+                init_b_trainable = torch.randn(self.rank, self.out_features, device=self.w.device)
                 init_w = self.w.data
+
             else:
-                raise AttributeError(
-                    f"Unknown factorize method: {self.factorize_method}. Method must be one of ['equal', 'add']"
-                )
+                # Factorize
+                u, s, vt = torch.linalg.svd(self.w.data, full_matrices=False)  # [in_f, r],[r,],[r, out_f]
+                a = s.reshape(1, -1) * u
+                b = vt
+                w_hat = a @ b
+
+                # Check reconstruction error
+                if not self.fast_mode:
+                    assert torch.allclose(self.w.data, w_hat, atol=1e-2), "ERROR: Reconstruction error is too large"
+                trainable_indices, fixed_indices = self._select_k_from_n(self.rank, rank_upper_bound, mode=self.sample_method)
+
+                # Set trainable and fixed parameters
+                init_a_trainable = a[:, trainable_indices]  # [in_f, r']
+                init_b_trainable = b[trainable_indices, :]  # [r', out_f]
+                init_a_fixed = a[:, fixed_indices]
+                init_b_fixed = b[fixed_indices, :]
+
+                if self.factorize_method == 'equal':  # (regular) init + ortho
+                    init_w = init_a_fixed @ init_b_fixed
+                elif self.factorize_method == 'add':  # init
+                    init_w = self.w.data
+                else:
+                    raise AttributeError(
+                        f"Unknown factorize method: {self.factorize_method}. Method must be one of ['equal', 'add']"
+                    )
 
             # Initialize
             self.a.data = init_a_trainable

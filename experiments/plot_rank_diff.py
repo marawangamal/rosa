@@ -130,8 +130,8 @@ def get_dataloaders(args, tokenizer):
 
 def main():
 
-    out_path = "../figures/singular_values_diff_lora.pdf"
-    arr_path = "../figures/singular_values_diff_lora.npy"
+    out_path = "../figures-old/singular_values_diff_lora.pdf"
+    arr_path = "../figures-old/singular_values_diff_lora.npy"
     # Load model from
     ckpt_root = "/home/mila/m/marawan.gamal/scratch/rosa/runs/glue/cola"
     # exp = "e10_l0.002_b32_f1.0_s512_nadamw_be0.9_0.98_ep1e-08_w0.1_nalinear_wa0.06_namroberta-base_namerosa_fa1_facepoch_iTrue_r8_leepoch_factrandom_factoequal_uFalse_t0"

@@ -1,3 +1,4 @@
+figures-old/
 figures/
 figures_/
 .idea
@@ -8,3 +9,4 @@ __pycache__
 peftnet/__pycache__
 venv
 *.png
+*.pdf

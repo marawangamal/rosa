@@ -122,7 +122,8 @@ def get_yaml_dict(yaml_path="conf_clm.yaml"):
             print(exc)
 
 
-def get_experiment_name(configs, abbrevs=None):
+def get_experiment_name(configs, abbrevs=None, mode='dict'):
+    assert mode in ['str', 'dict'], f"Invalid mode: {mode}. Must be either 'str' or 'dict'."
     if abbrevs is None:
         abbrevs = {}
 
@@ -139,6 +140,10 @@ def get_experiment_name(configs, abbrevs=None):
 
                 if i == len(key) + 1:
                     raise ValueError("Could not find a suitable abbreviation for key: {}".format(key))
+
+    if mode == 'str':
+        return '_'.join(['{}{}'.format(k, v) for k, v in abbrevs.items()])
+
 
     return abbrevs
 
@@ -426,7 +431,7 @@ def refactorize(model: nn.Module, optimizer: torch.optim):
     return model, optimizer
 
 
-def heatmap_cumsum_singular_vals(model, regular_expression=".*attention", out_path="figures/cumsum_singular_vals.png"):
+def heatmap_cumsum_singular_vals(model, regular_expression=".*attention", out_path="figures-old/cumsum_singular_vals.png"):
     """Plot heatmap of cumulative sum of singular values in each layer of the model matching the regular expression."""
     cumsum_singular_vals = {}
 

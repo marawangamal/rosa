@@ -347,8 +347,9 @@ def train(
         # whatever you are timing goes here
 
         # Mask gradients of RosaNet
-        if args['fnmodel']['name'] == "rosa" and args['fnmodel']['factorize_level'] == "epoch" and \
-                (i_epoch == 0 or i_epoch % args['fnmodel']['factorize_freq'] == 0):
+        if args['fnmodel']['name'] == "rosa" and args['fnmodel']['factorize_level'] == "epoch" \
+            and ((i_epoch == 0 and not args['fnmodel']['params']['factorize_method'] == 'random')
+                 or ( i_epoch > 0 and i_epoch % args['fnmodel']['factorize_freq'] == 0)):
             num_training_steps = args['train']['epochs'] * len(train_dataloader)
             cmodel, optimizer, lr_scheduler = factorize(
                 args, cmodel, lr_scheduler, optimizer, steps_counter, num_training_steps

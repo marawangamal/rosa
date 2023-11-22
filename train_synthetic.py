@@ -1,10 +1,10 @@
 import copy
-import argparse
+import os
+import os.path as osp
 
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch
-from torch.utils.data import DataLoader
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
@@ -104,11 +104,9 @@ def main(cfg: DictConfig):
     # *** End of Config ***
 
     # Get experiment name
-    exp_name = get_experiment_name(
-        {"train": args["train"], "exps": args["exps"], "model": args["model"]}
+    filename = get_experiment_name(
+        {"train": args["train"], "exps": args["exps"], "model": args["model"]}, mode="str"
     )
-    filename = "_".join(["{}{}".format(k, v) for k, v in exp_name.items()])
-
     # Set seeds
     set_seeds(42)
 
@@ -145,11 +143,10 @@ def main(cfg: DictConfig):
                 max(r, 1): plt.cm.get_cmap('tab10')(i) for i, r in
                 enumerate(range(0, peft_rank_max + 1, peft_rank_step))
             }
-            rank = int(name.split('=')[-1][:-2])
+            rank = int(name.split('=')[-1][:-2]) if "FT" not in name else 0
             color = rank_colors[rank] if "FT" not in name else "black"
             marker = {"LoRA": "--", "ROSA": "-", "FT": "-"}[name.split(" ")[0]]
             return color, marker
-
 
     elif args['exps']['name'] == "rosa_ablation_top_bottom":
         # Compare ROSA with different factorization modes
@@ -179,7 +176,6 @@ def main(cfg: DictConfig):
     total_steps = n_epochs
     factorize_freq = max(total_steps // factorize_steps, 1)
     print("Total steps: {} | Factorize freq: {}\n".format(total_steps, factorize_freq))
-
 
     for name, model in peft_models.items():
 
@@ -225,7 +221,11 @@ def main(cfg: DictConfig):
     plt.xlabel("Iterations")
     plt.ylabel("Validation Loss")
     plt.legend()
-    plt.savefig("figures/synthetic_{}.png".format(filename), dpi=300)
+    outfile = osp.join(args['output'], "synthetic_{}.png".format(filename))
+    if not os.path.exists(args['output']):
+        os.makedirs(args['output'])
+    plt.savefig(outfile, dpi=300)
+    print("Saved figure to {}".format(outfile))
 
 
 if __name__ == '__main__':
@@ -235,5 +235,5 @@ if __name__ == '__main__':
     # python train_synthetic.py model.name=linear exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=500
 
     # 2-layer
-    # python train_synthetic.py model.name=mlp2 exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=1000
+    # python train_synthetic.py model.name=mlp2 exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=1000 &&
     # python train_synthetic.py data.out_f=10 model.name=mlp2 exps.peft_rank_max=8 exps.peft_rank_step=2 exps.true_rank=24 train.epochs=1000

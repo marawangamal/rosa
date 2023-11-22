@@ -249,7 +249,7 @@ def main():
     # plt.xlabel("Dimension")
     # plt.ylabel("Gradient")
     # plt.legend()
-    # plt.savefig(f"figures/grads_all_{filename}.png")
+    # plt.savefig(f"figures-old/grads_all_{filename}.png")
 
 
 if __name__ == '__main__':
