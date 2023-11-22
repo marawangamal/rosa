@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import copy
 
-def forward_layerwise(layers, x, device='cpu', verbose=True):
+def forward_layerwise(layers, x, device='cpu', verbose=False):
     """ Forward pass through a list of layers.
 
     Description:
@@ -51,10 +51,9 @@ def cuda_time_operation(func, func_kwargs, device='cuda:0', verbose=False):
 
 if __name__ == '__main__':
     # Config
-    input_size = 512
-    hidden_sizes = (512, 512, 512)
-    batch_size = 32
-
+    input_size = 1024
+    hidden_sizes = (1024, 1024, 1024)
+    batch_size = 128
 
     # Create random TensorDataset
     dataset = torch.rand(1000, input_size)
@@ -74,20 +73,40 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
 
-    # Forward pass (layer-wise)
-    x = next(iter(dataloader))
-    elapsed_layer_wise = cuda_time_operation(
-        forward_layerwise, {'layers': layers, 'x': x, 'device': device}, device=device
-    )
-    # Forward pass (nn.Sequential)
-    x = next(iter(dataloader))
-    mlp_func = lambda x: mlp(x)
-    mlp.to(device)
-    x = x.to(device)
-    elapsed_sequential = cuda_time_operation(
-        mlp_func, {'x': x}, device=device
-    )
+    elapsed_sequential_samples = []
+    elapsed_layerwise_samples = []
+    iterations = 1000
+    warmup = 100
+    for t in range(iterations + warmup):
 
-    print(f"Layer-wise: {elapsed_layer_wise:0.2f}ms")
-    print(f"Sequential: {elapsed_sequential:0.2f}ms")
+        # Forward pass (layer-wise)
+        x = next(iter(dataloader))
+        elapsed_layer_wise = cuda_time_operation(
+            forward_layerwise, {'layers': layers, 'x': x, 'device': device}, device=device
+        )
+        if t >= warmup:
+            elapsed_layerwise_samples.append(elapsed_layer_wise)
+
+        # Forward pass (nn.Sequential)
+        x = next(iter(dataloader))
+        mlp_func = lambda x: mlp(x)
+        mlp.to(device)
+        x = x.to(device)
+        elapsed_sequential = cuda_time_operation(
+            mlp_func, {'x': x}, device=device
+        )
+        if t >= warmup:
+            elapsed_sequential_samples.append(elapsed_sequential)
+
+    # Compute mean and std
+    elapsed_layer_wise = torch.tensor(elapsed_layerwise_samples)
+    elapsed_sequential = torch.tensor(elapsed_sequential_samples)
+    elapsed_layer_wise_mean = elapsed_layer_wise.mean().item()
+    elapsed_sequential_mean = elapsed_sequential.mean().item()
+    elapsed_layer_wise_std = elapsed_layer_wise.std().item()
+    elapsed_sequential_std = elapsed_sequential.std().item()
+
+    n_samples = len(elapsed_layer_wise)
+    print(f"Layer-wise: {elapsed_layer_wise_mean:0.2f}ms ± {elapsed_layer_wise_std:0.2f}ms (n={n_samples})")
+    print(f"Sequential: {elapsed_sequential_mean:0.2f}ms ± {elapsed_sequential_std:0.2f}ms (n={n_samples})")
 
